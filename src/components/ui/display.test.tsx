@@ -87,16 +87,27 @@ describe("ConfirmedMark", () => {
 });
 
 describe("PlaceBadge", () => {
-  it("shows the country code and city", () => {
-    render(<PlaceBadge countryCode="gb" city="Leeds" />);
-    expect(screen.getByText("GB")).toBeInTheDocument();
+  it("shows the flag and the city, and reads as country then city", () => {
+    const { container } = render(<PlaceBadge countryCode="gb" city="Leeds" />);
+    const flag = screen.getByRole("img", { name: "United Kingdom" });
+    expect(flag).toHaveAttribute("src", "/flags/gb.svg");
     expect(screen.getByText("Leeds")).toBeInTheDocument();
+    expect(screen.queryByText("GB")).toBeNull();
+    expect(container).toHaveTextContent("Leeds");
+    expect(container.textContent).toBe(",Leeds");
   });
 
-  it("shows only what is known", () => {
+  it("shows only the flag when there is no city", () => {
     render(<PlaceBadge countryCode="IE" city={null} />);
-    expect(screen.getByText("IE")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Ireland" })).toBeInTheDocument();
+    expect(screen.queryByText("IE")).toBeNull();
     expect(screen.queryByText("Place not known")).toBeNull();
+  });
+
+  it("shows only the city when there is no country", () => {
+    render(<PlaceBadge countryCode={null} city="Edinburgh" />);
+    expect(screen.getByText("Edinburgh")).toBeInTheDocument();
+    expect(screen.queryByRole("img")).toBeNull();
   });
 
   it("says Place not known when nothing is known", () => {

@@ -15,6 +15,7 @@ import {
   type Params,
   type Update,
 } from "./filter-controls";
+import { CountryFlag } from "@/components/ui/country-flag";
 
 /** One choice in the place box: a UK region, a town or a country. */
 export interface PlaceOption {
@@ -33,6 +34,21 @@ const HINTS: Readonly<Record<(typeof PLACE_KEYS)[number], string>> = {
 };
 
 const DEFAULT_KM = "25";
+
+/** The place name, with a flag before a country. */
+function PlaceLabel({
+  option,
+}: {
+  option: { key: string; value: string; label: string };
+}) {
+  if (option.key !== "country") return <span>{option.label}</span>;
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <CountryFlag countryCode={option.value} decorative />
+      {option.label}
+    </span>
+  );
+}
 
 function normal(text: string): string {
   return text.trim().toLowerCase();
@@ -118,7 +134,7 @@ export function PlaceBox({
                         )
                       }
                     />
-                    {place.label}
+                    <PlaceLabel option={place} />
                     <span className="text-muted">{HINTS[place.key]}</span>
                   </label>
                 </li>
@@ -377,7 +393,7 @@ export function PlaceCombobox({
               index === current ? "bg-surface-sunk" : ""
             }`}
           >
-            <span>{option.label}</span>
+            <PlaceLabel option={option} />
             <span className="text-xs text-muted">{HINTS[option.key]}</span>
           </li>
         ))}

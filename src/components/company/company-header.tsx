@@ -54,7 +54,7 @@ export function CompanyHeader({
         <p className="mt-2 text-[13px] text-muted">No description yet.</p>
       )}
       <p className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] sm:mt-3">
-        <PlaceBadge countryCode={countryCode} city={place} />
+        <PlaceBadge countryCode={countryCode} city={place} size="lg" />
         <span aria-hidden="true" className="text-faint">
           ·
         </span>

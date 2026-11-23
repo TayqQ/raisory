@@ -86,7 +86,7 @@ Each component is small and has no data access: it takes values, renders them, a
 | `Amount` | GBP first, original currency small beneath when it differs | "Undisclosed" in muted text when null. Sizes `sm` (list) and `lg` (company) |
 | `StageChip` | Stage text plus a small stage-ramp marker | Never colour alone. Normalised label (`Series F` shows "Series F" but uses the late-stage colour) |
 | `ConfirmedMark` | Tick icon plus "Confirmed" | Its title is the confirmation text. It replaces the current `confirmed-marker` look and keeps its tests |
-| `PlaceBadge` | Country-code badge plus city | "Place not known" in muted text |
+| `PlaceBadge` | Country flag (`CountryFlag`, a static SVG from `public/flags`, 16 × 12 px, 20 × 15 px in the company header) plus city | The flag's alt text is the country name; a code with no file shows as text; "Place not known" in muted text |
 | `SectorLabel` | The main sector | "Sector pending" in muted text when null |
 | `RelativeDate` | "Yesterday", "4 days ago", then a date after 14 days | Exact date in `title` and `<time dateTime>` |
 | `NewMark` | A brass dot plus "New" | Rounds announced within 2 days |

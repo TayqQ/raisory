@@ -471,7 +471,9 @@ describe("CompanyHeader", () => {
       screen.getByRole("heading", { level: 1, name: "Acme Robotics" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Sector pending")).toBeInTheDocument();
-    expect(screen.getByText("GB")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "United Kingdom" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Acquired")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Robotics" })).toHaveAttribute(
       "href",
