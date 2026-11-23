@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type {
   CollectStats,
   ConfirmStats,
@@ -35,7 +35,10 @@ import type { Db } from "@/db/client";
 import {
   EMBEDDING_DIMENSIONS,
   acquisitions,
+  companies,
+  eventSources,
   events,
+  extractions,
   fundingRounds,
   ingestRuns,
   investors,
@@ -49,6 +52,7 @@ import { linkFormDFilings } from "./filings/link-form-d";
 import { emptyFormDStats } from "./filings/store-form-d";
 import { isCandidate } from "./extract/prefilter";
 import { estimateCost } from "./extract/pricing";
+import { betterExtraction, placeholderCompanyCount } from "./extract/retry";
 import {
   collectGrantsStep,
   type CollectGrantsOptions,
@@ -71,6 +75,7 @@ import { confirmStep } from "./registry/confirm-events";
 import { registryStep as companiesHouseStep } from "./registry/registry-step";
 import { recomputeEvent } from "./resolve/canonicalise";
 import { resolveExtraction } from "./resolve/resolve-extraction";
+import { isPlaceholderCompanyName } from "./names/placeholder";
 import { RobotsSkipError } from "@/lib/robots";
 import { SOURCES } from "./sources";
 import {
@@ -90,6 +95,7 @@ import {
 import { getRatesOnOrBefore, upsertRates } from "./store/fx-rates";
 import { finishRun, startRun } from "./store/ingest-runs";
 import {
+  getPipelineItem,
   insertCollectedItems,
   listItemsForReextract,
   listPendingItems,
@@ -140,6 +146,11 @@ export const COLLECTED_SOURCE_KINDS: readonly SourceKind[] = ["rss"];
 export interface PipelineConfig {
   /** Extraction model, also used for grant tagging and theme naming. */
   model: string;
+  /**
+   * `EXTRACTION_RETRY_MODEL` (D69): one more try for an item whose company
+   * name came back as a placeholder. Absent: no retry.
+   */
+  retryModel?: string;
   /** Theme check model (D49). Absent: the extraction model. */
   themeCheckModel?: string;
   maxExtractionsPerRun: number;
@@ -171,6 +182,11 @@ export interface PipelineDeps {
   llm: LlmClient | null;
   /** The theme check client, bound to `config.themeCheckModel`. Absent: `llm`. */
   themeCheckLlm?: LlmClient | null;
+  /**
+   * The extraction retry client, bound to `config.retryModel` (D69). Null or
+   * absent: an item with a placeholder company name is not retried.
+   */
+  retryLlm?: LlmClient | null;
   /** Null when no key is configured: tags wait for a later run. */
   embedder: EmbeddingClient | null;
   /** Gateway to Research. Used only by `pnpm ingest grants`, never by `run`. */
@@ -296,26 +312,71 @@ export async function prefilterStep(
   };
 }
 
+function promptInput(item: PipelineSourceItem) {
+  return {
+    title: item.title,
+    summary: item.summary,
+    lead: item.lead,
+    url: item.url,
+    sourceName: item.sourceName,
+    publishedAt: item.publishedAt,
+  };
+}
+
+/**
+ * Extracts one item and stores the result as its current extraction. A
+ * placeholder company name ("startup") gets one retry on the retry model,
+ * through the same budget guard, and the better result is kept (D69). Both
+ * calls are recorded in `llm_usage`. A budget, price or provider refusal on
+ * the retry is thrown like any other, so the item stays pending.
+ */
 async function extractOne(
   deps: PipelineDeps,
   llm: LlmClient,
   item: PipelineSourceItem,
   purposeRunId: number | undefined,
 ) {
-  const extraction = await extractItem({
-    item: {
-      title: item.title,
-      summary: item.summary,
-      url: item.url,
-      sourceName: item.sourceName,
-      publishedAt: item.publishedAt,
-    },
+  const input = promptInput(item);
+  const first = await extractItem({
+    item: input,
     llm,
     budget: deps.budget,
     model: deps.config.model,
     sourceItemId: item.id,
     ingestRunId: purposeRunId,
   });
+  let extraction = first;
+  let retried = false;
+  const retryModel = deps.config.retryModel;
+  if (
+    placeholderCompanyCount(first.result) > 0 &&
+    retryModel &&
+    deps.retryLlm
+  ) {
+    retried = true;
+    try {
+      const retry = await extractItem({
+        item: input,
+        llm: deps.retryLlm,
+        budget: deps.budget,
+        model: retryModel,
+        sourceItemId: item.id,
+        ingestRunId: purposeRunId,
+      });
+      extraction = betterExtraction(first, retry);
+    } catch (error) {
+      if (
+        error instanceof BudgetExceededError ||
+        error instanceof UnknownModelPriceError ||
+        isProviderError(error)
+      ) {
+        throw error;
+      }
+      deps.log(
+        `Retry of item ${item.id} on ${retryModel} failed, keeping the first result: ${describe(error)}`,
+      );
+    }
+  }
   const stored = await insertExtraction(deps.db, {
     sourceItemId: item.id,
     promptVersion: extraction.promptVersion,
@@ -326,7 +387,7 @@ async function extractOne(
     outputTokens: extraction.usage.outputTokens,
     costUsdMicros: extraction.costUsdMicros,
   });
-  return { extraction, stored };
+  return { extraction, stored, retried };
 }
 
 export async function extractStep(
@@ -338,6 +399,7 @@ export async function extractStep(
     itemsRelevant: 0,
     itemsErrored: 0,
     itemsFailed: 0,
+    itemsRetried: 0,
     budgetPaused: false,
   };
   if (!deps.llm) {
@@ -359,9 +421,15 @@ export async function extractStep(
     }
     stats.itemsAttempted += 1;
     try {
-      const { extraction } = await extractOne(deps, deps.llm, item, deps.runId);
+      const { extraction, retried } = await extractOne(
+        deps,
+        deps.llm,
+        item,
+        deps.runId,
+      );
       await markExtracted(deps.db, item.id);
       stats.itemsExtracted += 1;
+      if (retried) stats.itemsRetried = (stats.itemsRetried ?? 0) + 1;
       if (extraction.result.isRelevant) stats.itemsRelevant += 1;
     } catch (error) {
       if (error instanceof BudgetExceededError) {
@@ -399,6 +467,7 @@ export async function resolveStep(deps: PipelineDeps): Promise<ResolveStats> {
     mergeCandidatesCreated: 0,
     extractionsFailed: 0,
     grantReportsAttached: 0,
+    eventsHeldPlaceholder: 0,
   };
   const before = await resolutionCounts(deps.db);
   const pending = await listUnresolvedExtractions(deps.db, STEP_BATCH_LIMIT);
@@ -416,6 +485,11 @@ export async function resolveStep(deps: PipelineDeps): Promise<ResolveStats> {
       stats.eventsUpdated += outcome.eventsUpdated;
       stats.grantReportsAttached =
         (stats.grantReportsAttached ?? 0) + outcome.grantReportsAttached;
+      if (outcome.eventsHeldPlaceholder > 0) {
+        stats.eventsHeldPlaceholder =
+          (stats.eventsHeldPlaceholder ?? 0) + outcome.eventsHeldPlaceholder;
+        logHeld(deps, extraction.sourceItemId, outcome.eventsHeldPlaceholder);
+      }
     } catch (error) {
       stats.extractionsFailed = (stats.extractionsFailed ?? 0) + 1;
       deps.log(
@@ -427,6 +501,12 @@ export async function resolveStep(deps: PipelineDeps): Promise<ResolveStats> {
   stats.investorsCreated = after.investors - before.investors;
   stats.mergeCandidatesCreated = after.candidates - before.candidates;
   return stats;
+}
+
+/** One line per held item, so a placeholder name can be found and fixed (D69). */
+function logHeld(deps: PipelineDeps, sourceItemId: number, events: number) {
+  const count = events > 1 ? ` (${events} events)` : "";
+  deps.log(`held: placeholder company name (item ${sourceItemId})${count}`);
 }
 
 async function resolutionCounts(db: Db) {
@@ -1476,13 +1556,7 @@ export async function reextractStep(
     estimatedUsdMicros += estimateCost({
       model: deps.config.model,
       system: buildSystemPrompt(),
-      user: buildUserPrompt({
-        title: item.title,
-        summary: item.summary,
-        url: item.url,
-        sourceName: item.sourceName,
-        publishedAt: item.publishedAt,
-      }),
+      user: buildUserPrompt(promptInput(item)),
       maxOutputTokens: 1200,
     }).usdMicros;
   }
@@ -1500,8 +1574,155 @@ export async function reextractStep(
 
   for (const item of items) {
     const { stored } = await extractOne(deps, deps.llm, item, deps.runId);
-    await resolveExtraction(deps.db, stored.id);
+    const outcome = await resolveExtraction(deps.db, stored.id);
+    if (outcome.eventsHeldPlaceholder > 0) {
+      logHeld(deps, item.id, outcome.eventsHeldPlaceholder);
+    }
     summary.extracted += 1;
   }
   return summary;
+}
+
+export interface ReextractItemOptions {
+  sourceItemId: number;
+  /** Without it the step only previews: no LLM call, no write. */
+  yes: boolean;
+}
+
+/** An extraction of the item, with the company names it gives. */
+export interface ReextractItemExtraction {
+  id: number;
+  promptVersion: string;
+  model: string;
+  companyNames: string[];
+}
+
+/** An event the item supports, with its company. */
+export interface ReextractItemEvent {
+  eventId: number;
+  companyId: number;
+  companyName: string;
+}
+
+export interface ReextractItemSummary {
+  sourceItemId: number;
+  title: string;
+  applied: boolean;
+  /** Why nothing was called: the current extraction already uses this prompt and has no placeholder name. */
+  skipped?: string;
+  /** Worst-case cost of the first call. A retry costs more. */
+  estimatedUsdMicros: number;
+  before: ReextractItemExtraction | null;
+  after: ReextractItemExtraction | null;
+  events: ReextractItemEvent[];
+  eventsHeldPlaceholder: number;
+}
+
+async function currentExtractionOf(
+  db: Db,
+  sourceItemId: number,
+): Promise<ReextractItemExtraction | null> {
+  const [row] = await db
+    .select({
+      id: extractions.id,
+      promptVersion: extractions.promptVersion,
+      model: extractions.model,
+      result: extractions.result,
+    })
+    .from(extractions)
+    .where(
+      and(
+        eq(extractions.sourceItemId, sourceItemId),
+        eq(extractions.isCurrent, true),
+      ),
+    )
+    .limit(1);
+  if (!row) return null;
+  return {
+    id: row.id,
+    promptVersion: row.promptVersion,
+    model: row.model,
+    companyNames: row.result.events.map((event) => event.company.name),
+  };
+}
+
+async function eventsOfItem(
+  db: Db,
+  sourceItemId: number,
+): Promise<ReextractItemEvent[]> {
+  return db
+    .select({
+      eventId: events.id,
+      companyId: companies.id,
+      companyName: companies.name,
+    })
+    .from(eventSources)
+    .innerJoin(events, eq(events.id, eventSources.eventId))
+    .innerJoin(companies, eq(companies.id, events.companyId))
+    .where(eq(eventSources.sourceItemId, sourceItemId))
+    .orderBy(asc(eventSources.eventIndex), asc(events.id));
+}
+
+/**
+ * `pnpm ingest reextract --item <id>` (D69): runs the current prompt, with
+ * the placeholder retry, on one item, makes the result its current
+ * extraction and resolves it, so its event moves to the right company. A
+ * company left with nothing is kept as it is. Without `yes` it only
+ * previews. Running it again changes nothing: an item whose current
+ * extraction already uses this prompt and has no placeholder name is
+ * skipped, and an identical result is not stored twice.
+ */
+export async function reextractItemStep(
+  deps: PipelineDeps,
+  options: ReextractItemOptions,
+): Promise<ReextractItemSummary> {
+  const item = await getPipelineItem(deps.db, options.sourceItemId);
+  if (!item)
+    throw new Error(`Source item ${options.sourceItemId} does not exist`);
+
+  const before = await currentExtractionOf(deps.db, item.id);
+  const summary: ReextractItemSummary = {
+    sourceItemId: item.id,
+    title: item.title,
+    applied: false,
+    estimatedUsdMicros: estimateCost({
+      model: deps.config.model,
+      system: buildSystemPrompt(),
+      user: buildUserPrompt(promptInput(item)),
+      maxOutputTokens: 1200,
+    }).usdMicros,
+    before,
+    after: before,
+    events: await eventsOfItem(deps.db, item.id),
+    eventsHeldPlaceholder: 0,
+  };
+  const upToDate =
+    before !== null &&
+    before.promptVersion === EXTRACTION_PROMPT_VERSION &&
+    !before.companyNames.some((name) => {
+      const trimmed = name.trim();
+      return trimmed.length > 0 && isPlaceholderCompanyName(trimmed);
+    });
+  if (upToDate) {
+    return {
+      ...summary,
+      skipped: `current extraction already uses prompt ${EXTRACTION_PROMPT_VERSION}`,
+    };
+  }
+  if (!options.yes) return summary;
+  if (!deps.llm) throw new Error("Re-extraction needs OPENAI_API_KEY.");
+
+  const { stored } = await extractOne(deps, deps.llm, item, deps.runId);
+  await markExtracted(deps.db, item.id);
+  const outcome = await resolveExtraction(deps.db, stored.id);
+  if (outcome.eventsHeldPlaceholder > 0) {
+    logHeld(deps, item.id, outcome.eventsHeldPlaceholder);
+  }
+  return {
+    ...summary,
+    applied: true,
+    after: await currentExtractionOf(deps.db, item.id),
+    events: await eventsOfItem(deps.db, item.id),
+    eventsHeldPlaceholder: outcome.eventsHeldPlaceholder,
+  };
 }

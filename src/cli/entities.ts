@@ -10,6 +10,10 @@ import {
   previewCompanyMerge,
   previewInvestorMerge,
 } from "@/pipeline/resolve/merge-entities";
+import {
+  previewRename,
+  renameEntity,
+} from "@/pipeline/resolve/rename-entities";
 import { loadDotEnv } from "./env";
 
 const USAGE = `Usage: pnpm entities <command>
@@ -18,7 +22,10 @@ const USAGE = `Usage: pnpm entities <command>
   merge --type <t> --keep <id> --merge <id> [--note "..."] [--yes]
                                                     Without --yes, shows what would change
   dismiss <candidate id>                            Close a candidate without merging
-  alias --type <t> --id <id> --alias "..."          Add an alias`;
+  alias --type <t> --id <id> --alias "..."          Add an alias
+  rename --type <t> --id <id> --name "..." [--note "..."] [--yes]
+                                                    Rename, with a new slug. Without --yes,
+                                                    shows what would change`;
 
 function entityType(value: string | undefined): MergeEntity | undefined {
   if (value === undefined) return undefined;
@@ -43,6 +50,7 @@ async function main(): Promise<number> {
       merge: { type: "string" },
       id: { type: "string" },
       alias: { type: "string" },
+      name: { type: "string" },
       note: { type: "string" },
       yes: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
@@ -99,6 +107,22 @@ async function main(): Promise<number> {
         }
         await addAlias(db, type, requireId(values.id, "--id"), values.alias);
         return 0;
+      case "rename": {
+        if (!type || values.name === undefined) {
+          throw new Error("rename needs --type, --id and --name");
+        }
+        const id = requireId(values.id, "--id");
+        const result = values.yes
+          ? await renameEntity(db, type, id, values.name, { note: values.note })
+          : await previewRename(db, type, id, values.name);
+        console.log(JSON.stringify(result));
+        if (result.sameNameIds.length > 0) {
+          console.error(
+            `Warning: ${type} ${result.sameNameIds.join(", ")} already has this name; consider a merge.`,
+          );
+        }
+        return 0;
+      }
       default:
         console.error(USAGE);
         return 1;

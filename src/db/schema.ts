@@ -181,6 +181,8 @@ export const sourceItemTexts = pgTable("source_item_texts", {
     .primaryKey()
     .references(() => sourceItems.id, { onDelete: "cascade" }),
   summary: text("summary"),
+  /** The opening of the article body from the feed (D69). LLM input only; the web role cannot read it. */
+  lead: text("lead"),
 });
 
 export const extractions = pgTable(

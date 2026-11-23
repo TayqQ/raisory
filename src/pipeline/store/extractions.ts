@@ -33,6 +33,7 @@ export interface UnresolvedExtraction {
   url: string;
   publishedAt: Date | null;
   summary: string | null;
+  lead: string | null;
   sourcePriority: number;
   sourceName: string;
 }
@@ -135,6 +136,7 @@ export async function listUnresolvedExtractions(
       url: sourceItems.url,
       publishedAt: sourceItems.publishedAt,
       summary: sourceItemTexts.summary,
+      lead: sourceItemTexts.lead,
       sourcePriority: sources.priority,
       sourceName: sources.name,
     })

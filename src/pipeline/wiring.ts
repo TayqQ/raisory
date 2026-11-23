@@ -77,6 +77,13 @@ export function createPipelineDeps(env: EnvSource): Wired {
         apiKey && parsed.THEME_CHECK_MODEL !== parsed.EXTRACTION_MODEL
           ? createOpenAiClient({ apiKey, model: parsed.THEME_CHECK_MODEL })
           : null,
+      retryLlm:
+        apiKey && parsed.EXTRACTION_RETRY_MODEL !== parsed.EXTRACTION_MODEL
+          ? createOpenAiClient({
+              apiKey,
+              model: parsed.EXTRACTION_RETRY_MODEL,
+            })
+          : null,
       embedder: apiKey
         ? createOpenAiEmbeddingClient({
             apiKey,
@@ -109,6 +116,7 @@ export function createPipelineDeps(env: EnvSource): Wired {
       clock,
       config: {
         model: parsed.EXTRACTION_MODEL,
+        retryModel: parsed.EXTRACTION_RETRY_MODEL,
         themeCheckModel: parsed.THEME_CHECK_MODEL,
         maxExtractionsPerRun: parsed.MAX_EXTRACTIONS_PER_RUN,
         maxIngestMinutesPerRun: parsed.MAX_INGEST_MINUTES_PER_RUN,

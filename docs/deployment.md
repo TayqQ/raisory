@@ -48,6 +48,7 @@ Variables:
 |---|---|
 | `INGEST_ENABLED` | `true`. Anything else stops ingestion |
 | `EXTRACTION_MODEL` | The model chosen in `docs/eval-results.md` |
+| `EXTRACTION_RETRY_MODEL` | Optional, default `gpt-5.6-terra`. One retry for an item whose company name came back as a placeholder such as "startup" (D69). It must be in the pricing table (`src/pipeline/extract/pricing.ts`). Set it to the same value as `EXTRACTION_MODEL` to turn the retry off |
 | `LLM_MONTHLY_CAP_GBP` | `3` |
 | `HTTP_CONTACT` | An email address where publishers and the SEC can reach you, sent in every User-Agent as `Raisory/<version> (+<HTTP_CONTACT>)`. SEC EDGAR needs an email address, so `pnpm ingest formd` refuses a URL |
 
@@ -195,6 +196,20 @@ Remove the variable, or set it to anything else, to resume. Nothing is lost whil
 ### Review links
 
 Automatic links are strict, so some companies wait for review. Review them from your machine with `pnpm registry` (`list`, `show`, `approve`, `reject`, `link`, `unlink`). It never calls an API, and the web app cannot run it. Manual decisions are final. Confirmations and sectors catch up on the next hourly run.
+
+### Fix data by hand
+
+A wrong company name, or an article read wrongly, can be fixed from the private repo's Actions tab with the **Fix data** workflow (`.github/workflows/fix-data.yml`, D69). It runs only in the private repo and uses the same `DATABASE_URL`, `OPENAI_API_KEY` and variables as the other workflows. Choose an action, fill in the inputs, and leave **confirm** unticked for a preview; tick it to apply. The step summary shows the result.
+
+| Action | Inputs | What it does |
+|---|---|---|
+| `rename-company` | `id` (company), `name` | Renames the company and gives it a new slug. The old name becomes an alias unless it is a placeholder. The old URL stops working |
+| `reextract-item` | `id` (source item) | Re-reads one article with the current prompt (and the placeholder retry), then resolves it again, so its event moves to the right company. Costs a fraction of a cent through the budget guard. Takes the ingest lock: if the hourly run is busy it prints `{"ran":false}`; run it again later |
+| `merge-company` | `id` (company to merge away), `keep_id` | The same as `pnpm entities merge --type company` |
+
+For a company created under a placeholder name, such as "startup": if the article names the company in its opening, run `reextract-item` on the article; the event moves to a company with the right name, and the placeholder company is left with no events. To keep the old company row instead (its id, first-seen date and registry links), rename it first, then re-extract: the event then resolves to the renamed company by name. If the rename preview lists `sameNameIds`, a company with that name already exists: merge instead. The same commands run locally as `pnpm entities rename` and `pnpm ingest reextract --item`.
+
+The hourly summary's "Held: placeholder name" row counts events whose company name was still a placeholder after the retry. The run log names each item (`held: placeholder company name (item N)`).
 
 ### Feeds and robots.txt
 

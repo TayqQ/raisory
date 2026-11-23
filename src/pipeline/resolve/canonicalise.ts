@@ -113,6 +113,7 @@ async function loadEvidence(db: Db, eventId: number): Promise<Evidence[]> {
       publishedAt: sourceItems.publishedAt,
       fetchedAt: sourceItems.fetchedAt,
       summary: sourceItemTexts.summary,
+      lead: sourceItemTexts.lead,
       priority: sources.priority,
     })
     .from(eventSources)
@@ -128,6 +129,7 @@ async function loadEvidence(db: Db, eventId: number): Promise<Evidence[]> {
     const processed = postProcess(row.result, {
       title: row.title,
       summary: row.summary,
+      lead: row.lead,
       url: row.url,
       publishedAt: row.publishedAt,
     });

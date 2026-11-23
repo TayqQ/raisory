@@ -35,6 +35,11 @@ export interface CollectedItem {
   /** Feed-provided summary. Used only as LLM input, never displayed. */
   summary: string | null;
   publishedAt: Date | null;
+  /**
+   * The opening of the article body, when the feed carries one (D69). Used
+   * only as LLM input, never displayed. Absent means the same as null.
+   */
+  lead?: string | null;
 }
 
 /** Price of one model in USD per million tokens. */
@@ -96,6 +101,8 @@ export interface ExtractStats {
   skipped?: boolean;
   /** Set when the provider itself refused (bad key, no credit, outage). */
   providerError?: string;
+  /** Items re-run on the retry model because of a placeholder company name (D69). */
+  itemsRetried?: number;
 }
 
 export interface ResolveStats {
@@ -109,6 +116,8 @@ export interface ResolveStats {
   extractionsFailed?: number;
   /** News grant reports attached to a grant event (Phase 3, D56). */
   grantReportsAttached?: number;
+  /** Events not created because the company name was a placeholder (D69). */
+  eventsHeldPlaceholder?: number;
 }
 
 export interface FxStats {

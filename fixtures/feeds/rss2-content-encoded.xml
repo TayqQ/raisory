@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	>
+<!-- Shape of the BusinessCloud feed on 23 Nov 2026 (WordPress, content:encoded on every item). The text is rewritten and shortened. -->
+<channel>
+	<title>Example Business News</title>
+	<link>https://news.example.com/</link>
+	<description>Synthetic feed in the BusinessCloud shape</description>
+	<item>
+		<title>Monzo alumni raise £1.8m for startup as angel invests</title>
+		<link>https://news.example.com/news/monzo-alumni-raise-1-8m-for-startup/</link>
+		<dc:creator><![CDATA[newsdesk]]></dc:creator>
+		<pubDate>Mon, 23 Nov 2026 09:02:17 +0000</pubDate>
+		<category><![CDATA[FinTech]]></category>
+		<guid isPermaLink="false">https://news.example.com/?p=275081</guid>
+		<description><![CDATA[<p>The startup&#039;s team previously built machine-learning scam models at Monzo, and the new money will go towards partner trials</p>
+<p>The post <a href="https://news.example.com/news/monzo-alumni-raise-1-8m-for-startup/">Monzo alumni raise £1.8m for startup as angel invests</a> appeared first on <a href="https://news.example.com">Example Business News</a>.</p>
+]]></description>
+		<content:encoded><![CDATA[<div id="attachment_1" style="width: 810px" class="wp-caption aligncenter"><img decoding="async" aria-describedby="caption-attachment-1" src="https://news.example.com/team.jpg" alt="" width="800" height="500" /><p id="caption-attachment-1" class="wp-caption-text">The founding team at their office</p></div>
+<p>Acorda, founded by former Monzo engineers, has raised &pound;1.8m in a pre-seed round.</p>
+<p>The founders spent years at the digital bank building machine-learning models to catch scams.</p>
+<p>They said the missing piece was always data, because banks know their own customers but very little about who they are paying.</p>
+<div id="div-gpt-in-content-1"></div>
+<p>The new startup is building scam-prevention technology for banks and will use the round to deliver trials with fintech partners.</p>
+<p>Acorda said its product lets payment providers see risk on both sides of a payment before money moves.</p>
+<blockquote class="wp-embedded-content" data-secret="abc"><p><a href="https://news.example.com/news/another-story/">Another story from the same site</a></p></blockquote>
+<p><iframe class="wp-embedded-content" sandbox="allow-scripts" title="&#8220;Another story from the same site&#8221;" src="https://news.example.com/news/another-story/embed/" width="500" height="282"></iframe></p>
+<p>The company said its goal is a product that people working in financial crime enjoy using.</p>
+<div id="protag-player"></div>
+<p>The round was led by Example Ventures, with investment also from a solo GP fund and a group of angels.</p>
+<a href="https://news.example.com/newsletter/" class="ad-sc-banner"><img decoding="async" alt="subscribe banner" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" height="90" width="728"/></a>
+<p>The founders thanked the investors in a social media post.</p>
+<p>The post <a href="https://news.example.com/news/monzo-alumni-raise-1-8m-for-startup/">Monzo alumni raise £1.8m for startup as angel invests</a> appeared first on <a href="https://news.example.com">Example Business News</a>.</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>Retailer warns of supplier data breach</title>
+		<link>https://news.example.com/news/retailer-supplier-breach/</link>
+		<pubDate>Mon, 23 Nov 2026 13:08:41 +0000</pubDate>
+		<guid isPermaLink="false">https://news.example.com/?p=275195</guid>
+		<description><![CDATA[<p>The retailer said an incident at a supplier exposed limited data</p>]]></description>
+	</item>
+</channel>
+</rss>

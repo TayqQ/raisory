@@ -26,6 +26,7 @@ import {
   matchGrantRecord,
   type IncomingEvent,
 } from "./event-matcher";
+import { isPlaceholderCompanyName } from "../names/placeholder";
 import { postProcess, type ProcessedEvent } from "./post-process";
 
 export interface ResolveOutcome {
@@ -36,6 +37,8 @@ export interface ResolveOutcome {
   eventsDeleted: number;
   /** Reports attached to a grant event from an official record (D56). */
   grantReportsAttached: number;
+  /** Events left out because the company name was a placeholder (D69). */
+  eventsHeldPlaceholder: number;
 }
 
 export interface ResolveExtractionOptions {
@@ -128,6 +131,7 @@ export async function resolveExtraction(
       eventsUpdated: 0,
       eventsDeleted: 0,
       grantReportsAttached: 0,
+      eventsHeldPlaceholder: 0,
     };
 
     const [row] = await tx
@@ -140,6 +144,7 @@ export async function resolveExtraction(
         publishedAt: sourceItems.publishedAt,
         fetchedAt: sourceItems.fetchedAt,
         summary: sourceItemTexts.summary,
+        lead: sourceItemTexts.lead,
       })
       .from(extractions)
       .innerJoin(sourceItems, eq(sourceItems.id, extractions.sourceItemId))
@@ -159,12 +164,18 @@ export async function resolveExtraction(
     const processed = postProcess(row.result, {
       title: row.title,
       summary: row.summary,
+      lead: row.lead,
       url: row.url,
       publishedAt: row.publishedAt,
     });
 
     const linked = new Set<number>();
     for (const event of processed) {
+      // A description such as "startup" is never published as a company (D69).
+      if (isPlaceholderCompanyName(event.company.name)) {
+        outcome.eventsHeldPlaceholder += 1;
+        continue;
+      }
       const date = event.announcedOn ?? fallbackDate;
       const money = amountOf(event);
       const converted = await convert(tx, money, date, fx);
@@ -183,7 +194,11 @@ export async function resolveExtraction(
       };
 
       let acquirerCompanyId: number | null = null;
-      if (event.type === "acquisition") {
+      // A placeholder acquirer keeps its text on the event but gets no company.
+      if (
+        event.type === "acquisition" &&
+        !isPlaceholderCompanyName(event.acquisition.acquirerName)
+      ) {
         const acquirer = await resolveCompany(
           tx,
           {

@@ -15,6 +15,12 @@ export const pipelineEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
   EXTRACTION_MODEL: z.string().min(1).default("gpt-5.6-luna"),
+  /**
+   * One retry for an item whose company name came back as a placeholder such
+   * as "startup" (D69). Must be in the pricing table. The same model as
+   * `EXTRACTION_MODEL` means no retry.
+   */
+  EXTRACTION_RETRY_MODEL: z.string().min(1).default("gpt-5.6-terra"),
   LLM_MONTHLY_CAP_GBP: z.coerce.number().positive().default(3),
   MAX_EXTRACTIONS_PER_RUN: z.coerce.number().int().positive().default(150),
   /** Time limit for the hourly run, checked between steps and items (D67). */

@@ -1,0 +1,1 @@
+ALTER TABLE "source_item_texts" ADD COLUMN "lead" text;

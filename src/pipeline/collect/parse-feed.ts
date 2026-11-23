@@ -1,5 +1,7 @@
 import { XMLParser, type X2jOptions } from "fast-xml-parser";
 import type { CollectedItem } from "@/core/domain";
+import { toPlainText } from "./html-text";
+import { articleLead } from "./lead";
 
 const SUMMARY_MAX_CHARS = 1000;
 
@@ -13,25 +15,6 @@ const parserOptions = {
 } satisfies X2jOptions;
 
 const parser = new XMLParser(parserOptions);
-
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  pound: "£",
-  euro: "€",
-  mdash: "—",
-  ndash: "–",
-  hellip: "…",
-  lsquo: "‘",
-  rsquo: "’",
-  ldquo: "“",
-  rdquo: "”",
-  copy: "©",
-};
 
 /**
  * Parse an RSS 2.0 or Atom document into collected items.
@@ -90,6 +73,7 @@ function toCollectedItem(
     fieldText(item.description) ??
     fieldText(item.summary) ??
     fieldText(item.content);
+  const body = bodyOf(item, summarySource);
 
   return {
     sourceSlug,
@@ -103,7 +87,27 @@ function toCollectedItem(
     publishedAt: parsePublishedAt(
       firstPresent(item, ["pubDate", "published", "updated"]),
     ),
+    lead: body === null ? null : articleLead(body),
   };
+}
+
+/**
+ * The article body, when the feed carries one: RSS `content:encoded`, or a
+ * `content` element whose text is longer than the summary. A `content`
+ * element that is the only text is already the summary.
+ */
+function bodyOf(
+  item: Record<string, unknown>,
+  summarySource: string | null,
+): string | null {
+  const encoded = fieldText(item.encoded);
+  if (encoded !== null) return encoded;
+  const content = fieldText(item.content);
+  if (content === null || summarySource === null || content === summarySource)
+    return null;
+  const contentLength = toPlainText(content)?.length ?? 0;
+  const summaryLength = toPlainText(summarySource)?.length ?? 0;
+  return contentLength > summaryLength ? content : null;
 }
 
 function firstPresent(
@@ -196,47 +200,6 @@ function fieldText(value: unknown, depth = 0): string | null {
     if (childText !== null) parts.push(childText);
   }
   return parts.length > 0 ? parts.join(" ") : null;
-}
-
-function toPlainText(input: string, maxChars?: number): string | null {
-  const stripped = stripHtml(input);
-  const decoded = decodeEntities(stripped);
-  const collapsed = decoded.replace(/\s+/g, " ").trim();
-  if (collapsed.length === 0) return null;
-  if (maxChars === undefined) return collapsed;
-  const chars = Array.from(collapsed);
-  if (chars.length <= maxChars) return collapsed;
-  return chars.slice(0, maxChars).join("");
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<[^>]+>/g, " ");
-}
-
-function decodeEntities(text: string): string {
-  return text.replace(
-    /&(#(?:x[0-9a-f]+|\d+)|[a-z][a-z0-9]+);/gi,
-    (match, raw: string) => {
-      const body = raw.toLowerCase();
-      if (body.startsWith("#x")) {
-        return codePointOr(match, Number.parseInt(body.slice(2), 16));
-      }
-      if (body.startsWith("#")) {
-        return codePointOr(match, Number.parseInt(body.slice(1), 10));
-      }
-      return NAMED_ENTITIES[body] ?? match;
-    },
-  );
-}
-
-function codePointOr(fallback: string, code: number): string {
-  if (!Number.isInteger(code) || code < 0 || code > 0x10ffff) return fallback;
-  if (code >= 0xd800 && code <= 0xdfff) return fallback;
-  return String.fromCodePoint(code);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

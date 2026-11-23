@@ -28,6 +28,7 @@ describe("parsePipelineEnv", () => {
     expect(parsePipelineEnv(secrets)).toEqual({
       ...secrets,
       EXTRACTION_MODEL: "gpt-5.6-luna",
+      EXTRACTION_RETRY_MODEL: "gpt-5.6-terra",
       LLM_MONTHLY_CAP_GBP: 3,
       MAX_EXTRACTIONS_PER_RUN: 150,
       MAX_INGEST_MINUTES_PER_RUN: 12,
@@ -54,6 +55,17 @@ describe("parsePipelineEnv", () => {
     });
     expect(env.LLM_MONTHLY_CAP_GBP).toBe(3);
     expect(env.EXTRACTION_MODEL).toBe("gpt-5.6-luna");
+  });
+
+  it("reads EXTRACTION_RETRY_MODEL and falls back to the default when empty", () => {
+    expect(
+      parsePipelineEnv({ ...secrets, EXTRACTION_RETRY_MODEL: "gpt-5.4-mini" })
+        .EXTRACTION_RETRY_MODEL,
+    ).toBe("gpt-5.4-mini");
+    expect(
+      parsePipelineEnv({ ...secrets, EXTRACTION_RETRY_MODEL: "" })
+        .EXTRACTION_RETRY_MODEL,
+    ).toBe("gpt-5.6-terra");
   });
 
   it("coerces numeric values", () => {

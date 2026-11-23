@@ -17,6 +17,7 @@ import {
   registryLinks,
 } from "@/db/schema";
 import { normaliseCompanyName, normaliseInvestorName } from "@/lib/normalise";
+import { isPlaceholderCompanyName } from "../names/placeholder";
 import {
   recomputeEventsForCompany,
   storedFx,
@@ -289,13 +290,17 @@ export async function mergeCompanies(
         normalisedAlias: merge.normalisedName,
         source: "merge" as const,
       },
-    ];
-    await tx
-      .insert(companyAliases)
-      .values(moved)
-      .onConflictDoNothing({
-        target: [companyAliases.companyId, companyAliases.normalisedAlias],
-      });
+    ].filter((alias) => !isPlaceholderCompanyName(alias.alias));
+    // A placeholder such as "startup" must never become a name the resolver
+    // matches on, or later stories about other startups would join this one.
+    if (moved.length > 0) {
+      await tx
+        .insert(companyAliases)
+        .values(moved)
+        .onConflictDoNothing({
+          target: [companyAliases.companyId, companyAliases.normalisedAlias],
+        });
+    }
 
     // Merge tags: counts add up, and the seen dates widen.
     const tagRows = await tx

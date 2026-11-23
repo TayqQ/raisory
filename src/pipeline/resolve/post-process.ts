@@ -12,6 +12,8 @@ const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 export interface ProcessItem {
   title: string;
   summary: string | null;
+  /** The article opening the model also read (D69). */
+  lead?: string | null;
   url: string;
   publishedAt: Date | null;
 }
@@ -127,7 +129,7 @@ export function postProcess(
   item: ProcessItem,
 ): ProcessedEvent[] {
   if (!result.isRelevant) return [];
-  const texts = [item.title, item.summary ?? "", item.url];
+  const texts = [item.title, item.summary ?? "", item.lead ?? "", item.url];
   const processed: ProcessedEvent[] = [];
 
   result.events.forEach((event, eventIndex) => {

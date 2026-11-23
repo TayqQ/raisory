@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parsePipelineEnv } from "@/core/env";
 import { UnknownModelPriceError } from "@/core/errors";
 import {
   MODEL_PRICES,
@@ -191,5 +192,18 @@ describe("embedding prices", () => {
     expect(() => estimateEmbeddingCost("text-embedding-9", ["x"])).toThrow(
       UnknownModelPriceError,
     );
+  });
+});
+
+describe("default models", () => {
+  it("prices the default extraction and retry models (D69)", () => {
+    const env = parsePipelineEnv({
+      DATABASE_URL: "postgres://test",
+      OPENAI_API_KEY: "sk-test",
+      HTTP_CONTACT: "https://example.com/contact",
+    });
+    const priced = MODEL_PRICES.map((price) => price.model);
+    expect(priced).toContain(env.EXTRACTION_MODEL);
+    expect(priced).toContain(env.EXTRACTION_RETRY_MODEL);
   });
 });

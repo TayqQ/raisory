@@ -484,3 +484,30 @@ Rejected that day:
 - GlobeNewswire and Business Wire return 403.
 - AltFi has closed; Maddyness UK and Silicon Canals are stale.
 - The British Business Bank, Innovate UK and UKRI feeds carry policy news, not rounds.
+
+## Article bodies in feeds (23 November 2026)
+
+Extraction reads the opening of the article body when a feed carries one (D69). Only what the feed itself carries is used; no article page is fetched.
+
+| Feed | Body in the feed | Checked |
+|---|---|---|
+| BusinessCloud | Yes, `content:encoded` on every item. The opening paragraph names the company even when the description does not (the "Monzo alumni raise £1.8m for startup" story, 23 November 2026) | Fetched once, 23 November 2026: 10 of 10 items. Captions (`wp-caption-text`), embedded related stories (`wp-embedded-content`), ad slots and the "The post … appeared first on BusinessCloud" line sit inside the body and are removed |
+| Tech Funding News | Yes, full text | 20 November 2026 research ("Full") |
+| The Recursive | Yes, full text | 20 November 2026 research ("Full") |
+| TechCrunch Venture | On some items (`content:encoded`) | A1, 8 October 2026 |
+| Crunchbase News | On some items (`content:encoded`) | A1, 8 October 2026 |
+| Silicon Republic | No, summaries only | 20 November 2026 research ("Summaries") |
+| Tech.eu, UKTN | Not read: their robots.txt disallows the feed (D68) | — |
+| EU-Startups | Not read while it blocks GitHub's IPs (D68) | — |
+
+Only BusinessCloud was fetched for this check. The collector keeps an opening for any feed that carries a body, so the rest can be confirmed from stored items after a run:
+
+```sql
+select s.slug, count(*) as items, count(t.lead) as with_opening
+from source_items i
+join sources s on s.id = i.source_id
+join source_item_texts t on t.source_item_id = i.id
+where i.fetched_at > now() - interval '2 days'
+group by s.slug
+order by s.slug;
+```

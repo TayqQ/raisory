@@ -127,6 +127,17 @@ describe("mergeCompanies", () => {
     expect(candidate?.status).toBe("merged");
   });
 
+  it("does not keep a placeholder name such as 'startup' as an alias", async () => {
+    const keep = await insertCompany(db, { name: "Acorda" });
+    const merge = await insertCompany(db, { name: "startup" });
+    await mergeCompanies(db, keep.id, merge.id);
+    const aliases = await db
+      .select()
+      .from(companyAliases)
+      .where(eq(companyAliases.companyId, keep.id));
+    expect(aliases.map((alias) => alias.alias)).toEqual(["Acorda"]);
+  });
+
   it("warns about look-alike events and does not merge them", async () => {
     const keep = await insertCompany(db, { name: "Acme" });
     const merge = await insertCompany(db, { name: "Acme Ltd Two" });

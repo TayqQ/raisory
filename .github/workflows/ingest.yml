@@ -36,6 +36,8 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       EXTRACTION_MODEL: ${{ vars.EXTRACTION_MODEL }}
+      # Empty means the default (gpt-5.6-terra), D69.
+      EXTRACTION_RETRY_MODEL: ${{ vars.EXTRACTION_RETRY_MODEL }}
       LLM_MONTHLY_CAP_GBP: ${{ vars.LLM_MONTHLY_CAP_GBP }}
       HTTP_CONTACT: ${{ vars.HTTP_CONTACT }}
       # Empty means the default (12 minutes).
@@ -75,6 +77,7 @@ jobs:
                   ["Filtered out", t.prefilter.itemsFilteredOut],
                   ["Extracted", t.extract.skipped ? "skipped: no key" : t.extract.itemsExtracted],
                   ["Events created", t.resolve.eventsCreated],
+                  ["Held: placeholder name", t.resolve.eventsHeldPlaceholder ?? 0],
                   ["Stopped early", t.stoppedAtTime ? "time limit" : "no"],
                   ["Locations", rebuilt(t.locations)],
                   ["Stats", rebuilt(t.stats)],

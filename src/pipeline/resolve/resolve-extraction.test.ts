@@ -449,3 +449,37 @@ describe("resolveExtraction", () => {
     expect(await db.select().from(mergeCandidates)).toHaveLength(1);
   });
 });
+
+describe("resolveExtraction and placeholder names (D69)", () => {
+  it("holds a placeholder company and still resolves the named one", async () => {
+    const { extractionId } = await report([
+      funding({ name: "startup" }),
+      funding({ name: "Acorda", amountText: "£1.8m" }),
+    ]);
+
+    const outcome = await resolveExtraction(db, extractionId);
+
+    expect(outcome).toMatchObject({
+      eventsHeldPlaceholder: 1,
+      eventsCreated: 1,
+      companiesCreated: 1,
+    });
+    const names = await db.select({ name: companies.name }).from(companies);
+    expect(names).toEqual([{ name: "Acorda" }]);
+  });
+
+  it("keeps an acquisition with a placeholder buyer but makes no buyer company", async () => {
+    const { extractionId } = await report([
+      acquisition("Northwind Labs", "a US firm"),
+    ]);
+
+    const outcome = await resolveExtraction(db, extractionId);
+
+    expect(outcome).toMatchObject({ eventsCreated: 1, companiesCreated: 1 });
+    const [deal] = await db.select().from(acquisitions);
+    expect(deal).toMatchObject({
+      acquirerName: "a US firm",
+      acquirerCompanyId: null,
+    });
+  });
+});

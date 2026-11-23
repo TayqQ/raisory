@@ -23,13 +23,16 @@ import {
   companySectors,
   companyThemes,
   derivedRebuilds,
+  eventSources,
   events,
+  extractions,
   formDFilings,
   fundingRounds,
   grantParticipants,
   ingestRuns,
   llmUsage,
   registryLinks,
+  sourceItemTexts,
   sourceItems,
   themes,
 } from "@/db/schema";
@@ -52,6 +55,7 @@ import {
   ABANDONED_ERROR,
   closeAbandonedRuns,
   FormDContactError,
+  reextractItemStep,
   reextractStep,
   relinkGrantsStep,
   runAll,
@@ -1607,6 +1611,246 @@ describe("reextractStep", () => {
         yes: false,
       }),
     ).rejects.toThrow(/--yes/);
+  });
+});
+
+/** An extraction fake that names the company from a fixed list, one name per call. */
+function namingLlm(names: string[], seen: string[] = []) {
+  const state = { calls: 0 };
+  const llm: LlmClient = {
+    complete<T>(request: LlmCompleteRequest<T>): Promise<LlmCompleteResult<T>> {
+      seen.push(request.user);
+      const name = names[Math.min(state.calls, names.length - 1)] ?? "Unknown";
+      state.calls += 1;
+      const extraction: ExtractionV1 = {
+        isRelevant: true,
+        events: [fundingEvent(name)],
+      };
+      return Promise.resolve({
+        data: extraction as T,
+        usage: { inputTokens: 1000, outputTokens: 200 },
+        model: "fake",
+      });
+    },
+  };
+  return { llm, state };
+}
+
+const RETRY_MODEL = "gpt-5.6-terra";
+
+const monzoAlumni = {
+  "techcrunch-venture": [
+    {
+      ...headline("1635", "Monzo alumni raise £1.8m for startup"),
+      summary: "The startup's team previously built scam models at Monzo.",
+      lead: "Acorda, founded by former Monzo engineers, has raised £1.8m in a pre-seed round.",
+    },
+  ],
+};
+
+function withRetry(
+  first: LlmClient,
+  retry: LlmClient | null,
+  collector: Collector,
+  log?: string[],
+): PipelineDeps {
+  return {
+    ...deps(first, collector, { log, config: { retryModel: RETRY_MODEL } }),
+    retryLlm: retry,
+  };
+}
+
+async function companyNames(): Promise<string[]> {
+  const rows = await testDb.db
+    .select({ name: companies.name })
+    .from(companies)
+    .orderBy(asc(companies.id));
+  return rows.map((row) => row.name);
+}
+
+describe("article opening and placeholder names (D69)", () => {
+  it("sends the article opening to the model, labelled", async () => {
+    const seen: string[] = [];
+    const { llm } = namingLlm(["Acorda"], seen);
+    await runAll(deps(llm, fakeCollector(monzoAlumni)), lock(), "manual");
+
+    expect(seen[0]).toContain(
+      "Article opening: Acorda, founded by former Monzo engineers",
+    );
+    const [text] = await testDb.db.select().from(sourceItemTexts);
+    expect(text?.lead).toMatch(/^Acorda, founded/);
+  });
+
+  it("retries a placeholder name on the retry model and keeps the named result", async () => {
+    const first = namingLlm(["startup"]);
+    const retry = namingLlm(["Acorda"]);
+    const summary = await runAll(
+      withRetry(first.llm, retry.llm, fakeCollector(monzoAlumni)),
+      lock(),
+      "manual",
+    );
+
+    expect(first.state.calls).toBe(1);
+    expect(retry.state.calls).toBe(1);
+    expect(summary.stats?.extract.itemsRetried).toBe(1);
+    expect(summary.stats?.resolve.eventsHeldPlaceholder).toBe(0);
+    expect(await companyNames()).toEqual(["Acorda"]);
+    const usage = await testDb.db
+      .select({ model: llmUsage.model, purpose: llmUsage.purpose })
+      .from(llmUsage)
+      .orderBy(asc(llmUsage.id));
+    expect(usage).toEqual([
+      { model: "gpt-4.1-nano", purpose: "extraction" },
+      { model: RETRY_MODEL, purpose: "extraction" },
+    ]);
+    const [stored] = await testDb.db.select().from(extractions);
+    expect(stored?.model).toBe(RETRY_MODEL);
+    expect(stored?.isCurrent).toBe(true);
+  });
+
+  it("holds the event and creates nothing when the retry is a placeholder too", async () => {
+    const log: string[] = [];
+    const first = namingLlm(["startup"]);
+    const retry = namingLlm(["a London startup"]);
+    const summary = await runAll(
+      withRetry(first.llm, retry.llm, fakeCollector(monzoAlumni), log),
+      lock(),
+      "manual",
+    );
+
+    expect(summary.status).toBe("succeeded");
+    expect(summary.stats?.resolve.eventsHeldPlaceholder).toBe(1);
+    expect(summary.stats?.resolve.eventsCreated).toBe(0);
+    expect(summary.stats?.resolve.companiesCreated).toBe(0);
+    expect(await companyNames()).toEqual([]);
+    expect(await testDb.db.select().from(events)).toHaveLength(0);
+    expect(await testDb.db.select().from(llmUsage)).toHaveLength(2);
+    const [item] = await testDb.db.select().from(sourceItems);
+    expect(log).toContain(
+      `held: placeholder company name (item ${item?.id ?? 0})`,
+    );
+  });
+
+  it("makes no retry call when the first name is real", async () => {
+    const first = namingLlm(["Acorda"]);
+    const retry = namingLlm(["Other"]);
+    await runAll(
+      withRetry(first.llm, retry.llm, fakeCollector(monzoAlumni)),
+      lock(),
+      "manual",
+    );
+    expect(retry.state.calls).toBe(0);
+    expect(await testDb.db.select().from(llmUsage)).toHaveLength(1);
+  });
+
+  it("fills a missing lead when the item is seen again and changes nothing else", async () => {
+    const { llm } = namingLlm(["Acorda"]);
+    const withoutLead = {
+      "techcrunch-venture": [
+        { ...monzoAlumni["techcrunch-venture"][0]!, lead: null },
+      ],
+    };
+    await runAll(deps(llm, fakeCollector(withoutLead)), lock(), "manual");
+    const itemBefore = await testDb.db.select().from(sourceItems);
+    const [textBefore] = await testDb.db.select().from(sourceItemTexts);
+    expect(textBefore?.lead).toBeNull();
+
+    const second = await runAll(
+      deps(llm, fakeCollector(monzoAlumni)),
+      lock(),
+      "manual",
+    );
+
+    expect(second.stats?.collect.itemsInserted).toBe(0);
+    expect(second.stats?.extract.itemsAttempted).toBe(0);
+    const [textAfter] = await testDb.db.select().from(sourceItemTexts);
+    expect(textAfter).toEqual({
+      ...textBefore,
+      lead: monzoAlumni["techcrunch-venture"][0]!.lead,
+    });
+    expect(await testDb.db.select().from(sourceItems)).toEqual(itemBefore);
+
+    // A later sighting never replaces a stored lead.
+    const changed = {
+      "techcrunch-venture": [
+        {
+          ...monzoAlumni["techcrunch-venture"][0]!,
+          lead: "A different opening.",
+        },
+      ],
+    };
+    await runAll(deps(llm, fakeCollector(changed)), lock(), "manual");
+    const [textLater] = await testDb.db.select().from(sourceItemTexts);
+    expect(textLater?.lead).toBe(textAfter?.lead);
+  });
+});
+
+describe("reextractItemStep (D69)", () => {
+  async function storedItemId(): Promise<number> {
+    const [item] = await testDb.db.select().from(sourceItems);
+    return item?.id ?? 0;
+  }
+
+  it("previews without --yes, then moves the event to the right company, once", async () => {
+    // Before the guard, a v2 extraction made a company called "startup", as
+    // item 1635 did. Rebuild that state by hand.
+    const old = namingLlm(["Wrongname"]);
+    await runAll(deps(old.llm, fakeCollector(monzoAlumni)), lock(), "manual");
+    await testDb.db.execute("update extractions set prompt_version = 'v2'");
+    await testDb.db.execute(
+      "update companies set name = 'startup', normalised_name = 'startup', slug = 'startup'",
+    );
+    await testDb.db.execute(
+      `update extractions set result = jsonb_set(result, '{events,0,company,name}', '"startup"')`,
+    );
+    expect(await companyNames()).toEqual(["startup"]);
+    const sourceItemId = await storedItemId();
+
+    const fresh = namingLlm(["Acorda"]);
+    const retry = namingLlm(["Acorda"]);
+    const run = withRetry(fresh.llm, retry.llm, fakeCollector({}));
+
+    const preview = await reextractItemStep(run, { sourceItemId, yes: false });
+    expect(preview.applied).toBe(false);
+    expect(preview.before?.companyNames).toEqual(["startup"]);
+    expect(preview.estimatedUsdMicros).toBeGreaterThan(0);
+    expect(fresh.state.calls).toBe(0);
+
+    const applied = await reextractItemStep(run, { sourceItemId, yes: true });
+    expect(applied.applied).toBe(true);
+    expect(applied.after?.promptVersion).toBe(EXTRACTION_PROMPT_VERSION);
+    expect(applied.events.map((e) => e.companyName)).toEqual(["Acorda"]);
+    expect(retry.state.calls).toBe(0);
+    // The old company is left as it is, with no events.
+    expect(await companyNames()).toEqual(["startup", "Acorda"]);
+    const eventRows = await testDb.db.select().from(events);
+    expect(eventRows).toHaveLength(1);
+
+    const snapshot = async () => ({
+      extractions: await testDb.db
+        .select()
+        .from(extractions)
+        .orderBy(asc(extractions.id)),
+      events: await testDb.db.select().from(events).orderBy(asc(events.id)),
+      sources: await testDb.db.select().from(eventSources),
+      companies: await companyNames(),
+    });
+    const settled = await snapshot();
+    const again = await reextractItemStep(run, { sourceItemId, yes: true });
+    expect(again.applied).toBe(false);
+    expect(again.skipped).toMatch(/already uses prompt/);
+    expect(fresh.state.calls).toBe(1);
+    expect(await snapshot()).toEqual(settled);
+  });
+
+  it("refuses an item that does not exist", async () => {
+    const { llm } = namingLlm(["Acorda"]);
+    await expect(
+      reextractItemStep(deps(llm, fakeCollector({})), {
+        sourceItemId: 999,
+        yes: true,
+      }),
+    ).rejects.toThrow(/does not exist/);
   });
 });
 

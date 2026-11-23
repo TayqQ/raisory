@@ -9,6 +9,7 @@ import {
   fxStep,
   locationsStep,
   prefilterStep,
+  reextractItemStep,
   reextractStep,
   relinkGrantsStep,
   resolveStep,
@@ -40,7 +41,9 @@ Commands:
   extract    Prefilter pending items, then extract them
   resolve    Turn stored extractions into companies and events
   fx         Fetch missing rates and fill USD and GBP
-  reextract  Re-run extraction for the current prompt version
+  reextract  Re-run extraction for the current prompt version. With --item,
+             re-run one item (with the placeholder retry) and resolve it again,
+             under the lock; without --yes it only previews
   grants     Fetch new Innovate UK projects and organisations from Gateway to
              Research. Needs no LLM key. Recorded as a run
   registry   Link companies to Companies House and refresh their profiles,
@@ -59,10 +62,11 @@ Options:
   --trigger schedule|manual   run, enrich, grants, registry, formd: recorded on the run
                               (default manual)
   --prompt-version <v>        reextract: must match this build's prompt
+  --item <id>                 reextract: one source item instead of a batch
   --limit <n>                 reextract: most items to process (default 100)
   --dry-run                   reextract: print the estimate, call nothing.
                               relink-grants: list the pairs, change nothing
-  --yes                       reextract: confirm the spend
+  --yes                       reextract: confirm the spend (with --item: apply)
   --since YYYY-MM-DD          grants: skip projects that start before this date.
                               formd: first EDGAR day to collect
   --max-pages <n>             grants: most project pages to fetch (default 30)
@@ -117,6 +121,7 @@ async function main(): Promise<number> {
     options: {
       trigger: { type: "string", default: "manual" },
       "prompt-version": { type: "string" },
+      item: { type: "string" },
       limit: { type: "string", default: "100" },
       "dry-run": { type: "boolean", default: false },
       yes: { type: "boolean", default: false },
@@ -170,6 +175,15 @@ async function main(): Promise<number> {
       const summary = await recorded();
       print(summary);
       return summary.status === "failed" ? 1 : 0;
+    }
+
+    if (command === "reextract" && values.item !== undefined) {
+      const sourceItemId = positiveInt(values.item, "--item") ?? 0;
+      const locked = await withIngestLock(lock, () =>
+        reextractItemStep(deps, { sourceItemId, yes: values.yes }),
+      );
+      print(locked.ran ? locked.result : { ran: false });
+      return locked.ran ? 0 : 1;
     }
 
     if (command === "reextract") {

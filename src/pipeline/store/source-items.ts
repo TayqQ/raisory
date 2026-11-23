@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lt, notExists } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, notExists, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { CollectedItem } from "@/core/domain";
 import type { SourceItemStatus } from "@/core/enums";
@@ -24,6 +24,8 @@ export interface PipelineSourceItem {
   attempts: number;
   status: SourceItemStatus;
   summary: string | null;
+  /** The opening of the article body, when the feed carried one (D69). */
+  lead: string | null;
   sourceName: string;
 }
 
@@ -38,6 +40,7 @@ interface PreparedItem {
   canonicalUrl: string;
   title: string;
   summary: string | null;
+  lead: string | null;
   publishedAt: Date | null;
 }
 
@@ -53,6 +56,7 @@ const pipelineItemFields = {
   attempts: sourceItems.attempts,
   status: sourceItems.status,
   summary: sourceItemTexts.summary,
+  lead: sourceItemTexts.lead,
   sourceName: sources.name,
 };
 
@@ -88,6 +92,7 @@ function prepareItems(items: readonly CollectedItem[]): PreparedItem[] {
       canonicalUrl,
       title: item.title,
       summary: item.summary,
+      lead: item.lead ?? null,
       publishedAt: item.publishedAt,
     });
   }
@@ -96,8 +101,73 @@ function prepareItems(items: readonly CollectedItem[]): PreparedItem[] {
 }
 
 /**
- * Canonicalise URLs, then insert items and their summaries.
- * A canonical URL or external id that already exists is left unchanged.
+ * Gives an item already stored with no lead the lead from this batch (D69).
+ * Matches on canonical URL or on the source's external id, as the insert's
+ * conflict rules do. Nothing else about the item changes.
+ */
+async function fillMissingLeads(
+  db: Db,
+  sourceId: number,
+  items: readonly PreparedItem[],
+): Promise<void> {
+  const withLead = items.filter((item) => item.lead !== null);
+  if (withLead.length === 0) return;
+
+  const missing = await db
+    .select({
+      id: sourceItems.id,
+      canonicalUrl: sourceItems.canonicalUrl,
+      sourceId: sourceItems.sourceId,
+      externalId: sourceItems.externalId,
+    })
+    .from(sourceItems)
+    .innerJoin(
+      sourceItemTexts,
+      eq(sourceItemTexts.sourceItemId, sourceItems.id),
+    )
+    .where(
+      and(
+        isNull(sourceItemTexts.lead),
+        or(
+          inArray(
+            sourceItems.canonicalUrl,
+            withLead.map((item) => item.canonicalUrl),
+          ),
+          and(
+            eq(sourceItems.sourceId, sourceId),
+            inArray(
+              sourceItems.externalId,
+              withLead.map((item) => item.externalId),
+            ),
+          ),
+        ),
+      ),
+    );
+
+  for (const row of missing) {
+    const match =
+      withLead.find((item) => item.canonicalUrl === row.canonicalUrl) ??
+      withLead.find(
+        (item) =>
+          row.sourceId === sourceId && item.externalId === row.externalId,
+      );
+    if (!match?.lead) continue;
+    await db
+      .update(sourceItemTexts)
+      .set({ lead: match.lead })
+      .where(
+        and(
+          eq(sourceItemTexts.sourceItemId, row.id),
+          isNull(sourceItemTexts.lead),
+        ),
+      );
+  }
+}
+
+/**
+ * Canonicalise URLs, then insert items with their summaries and leads.
+ * A canonical URL or external id that already exists is left unchanged,
+ * except that a missing lead is filled from the feed (D69).
  */
 export async function insertCollectedItems(
   db: Db,
@@ -108,8 +178,11 @@ export async function insertCollectedItems(
 
   const prepared = prepareItems(items);
   if (prepared.length === 0) return { inserted: 0, skipped: items.length };
-  const summaryByUrl = new Map(
-    prepared.map((item) => [item.canonicalUrl, item.summary]),
+  const textByUrl = new Map(
+    prepared.map((item) => [
+      item.canonicalUrl,
+      { summary: item.summary, lead: item.lead },
+    ]),
   );
 
   const inserted = await db.transaction(async (tx) => {
@@ -137,7 +210,8 @@ export async function insertCollectedItems(
         .values(
           rows.map((row) => ({
             sourceItemId: row.id,
-            summary: summaryByUrl.get(row.canonicalUrl) ?? null,
+            summary: textByUrl.get(row.canonicalUrl)?.summary ?? null,
+            lead: textByUrl.get(row.canonicalUrl)?.lead ?? null,
           })),
         )
         .onConflictDoNothing();
@@ -146,10 +220,35 @@ export async function insertCollectedItems(
     return rows;
   });
 
+  const insertedUrls = new Set(inserted.map((row) => row.canonicalUrl));
+  await fillMissingLeads(
+    db,
+    sourceId,
+    prepared.filter((item) => !insertedUrls.has(item.canonicalUrl)),
+  );
+
   return {
     inserted: inserted.length,
     skipped: items.length - inserted.length,
   };
+}
+
+/** One stored item with its texts and source name, whatever its status. */
+export async function getPipelineItem(
+  db: Db,
+  id: number,
+): Promise<PipelineSourceItem | undefined> {
+  const [row] = await db
+    .select(pipelineItemFields)
+    .from(sourceItems)
+    .innerJoin(
+      sourceItemTexts,
+      eq(sourceItemTexts.sourceItemId, sourceItems.id),
+    )
+    .innerJoin(sources, eq(sources.id, sourceItems.sourceId))
+    .where(eq(sourceItems.id, id))
+    .limit(1);
+  return row;
 }
 
 /** Pending items with fewer than 3 attempts, oldest fetch first. */
