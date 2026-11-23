@@ -356,6 +356,12 @@ Verification date: **11 November 2026** (UTC). Methods: live requests to the API
 - What was measured from page 1 alone (100 projects, 130 participants): 67 participants have a company form in the name and are kept, 63 are skipped (universities, councils, and names with no company form). Of 4 organisations fetched as a sample, all 4 had `regNumber` null, and the 3 with a postcode checked all had a valid main-address postcode and region. Too small to give a share.
 - Limit of the rule: `regNumber` is only known after the organisation fetch, so a participant with no company form in its name is skipped even if it has a registration number. Real companies without "Ltd" (for example a trading name) are lost. Fixing it would mean fetching organisations for every skipped participant, including people's names, which D19 rules out.
 
+### A50 — Organisation websites (checked 23 November 2026)
+- The organisation record has a `website` field.
+- In a sample of 100 organisations from the API, and a spot check of 25 more, every one was empty.
+- So the field is stored as it comes, with an empty string meaning "fetched, no website". Organisations fetched earlier are **not** re-fetched for it: that would cost GtR about 2,000 requests for nothing.
+- If GtR starts filling the field, new fetches pick it up.
+
 ## A20 — Innovate UK funded-projects spreadsheets (not used)
 
 **Status: confirmed, rejected as a source**

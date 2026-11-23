@@ -20,6 +20,8 @@ import {
   REGISTRY_SEARCH_OUTCOMES,
   SECTOR_SOURCES,
   SOURCE_KINDS,
+  WEBSITE_RULES,
+  WEBSITE_SOURCES,
 } from "@/core/enums";
 import type { ExtractionV1 } from "@/core/extraction-schema";
 import type { Db } from "./client";
@@ -29,7 +31,9 @@ import {
   companies,
   companyAliases,
   companyLocations,
+  companyLogos,
   companySectors,
+  companyWebsites,
   EMBEDDING_DIMENSIONS,
   edgarIndexDays,
   eventConfirmations,
@@ -40,6 +44,7 @@ import {
   extractions,
   formDFilings,
   fundingRoundMomentum,
+  grantParticipants,
   fundingRounds,
   grantProjects,
   grantProjectTexts,
@@ -66,9 +71,11 @@ const EXPECTED_TABLES = [
   "companies",
   "company_aliases",
   "company_locations",
+  "company_logos",
   "company_sectors",
   "company_tags",
   "company_themes",
+  "company_websites",
   "derived_rebuilds",
   "edgar_index_days",
   "entity_merges",
@@ -133,6 +140,12 @@ const PHASE_3_PRIMARY_KEYS: Record<string, string[]> = {
   form_d_filings: ["id"],
   registry_links: ["id"],
   registry_searches: ["company_id", "registry"],
+};
+
+/** Primary key columns of the company website tables (migration 0005). */
+const WEBSITE_PRIMARY_KEYS: Record<string, string[]> = {
+  company_logos: ["company_id"],
+  company_websites: ["id"],
 };
 
 const MIGRATIONS_FOLDER = fileURLToPath(
@@ -1054,4 +1067,235 @@ describe("phase 3 migration", () => {
     expect(await db.select().from(eventConfirmations)).toEqual([]);
     expect(await db.select().from(companySectors)).toHaveLength(1);
   });
+});
+
+describe("website migration", () => {
+  async function insertWebsite(
+    companyId: number,
+    domain: string,
+    status: "linked" | "candidate" | "rejected",
+    overrides: Partial<typeof companyWebsites.$inferInsert> = {},
+  ) {
+    return db.insert(companyWebsites).values({
+      companyId,
+      domain,
+      status,
+      rule: status === "linked" ? "W1" : "C2",
+      source: "article",
+      evidence: "test",
+      checkedAt: new Date("2026-11-20T06:00:00Z"),
+      decidedBy: "auto",
+      fingerprint: "f1",
+      ...overrides,
+    });
+  }
+
+  const logoBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+  const logo = (companyId: number) => ({
+    companyId,
+    bytes: logoBytes,
+    mime: "image/png",
+    width: 180,
+    height: 180,
+    sha256: "a".repeat(64),
+    sourceUrl: "https://acme.example/apple-touch-icon.png",
+    fetchedAt: new Date("2026-11-20T06:00:00Z"),
+  });
+
+  it("gives every new table its primary key", async () => {
+    const keys = await primaryKeys();
+    for (const [table, columns] of Object.entries(WEBSITE_PRIMARY_KEYS)) {
+      expect(keys[table], table).toEqual(columns);
+    }
+  });
+
+  it("matches the new and appended enum values in src/core/enums.ts", async () => {
+    const [row] = await selectRows<Record<string, string>>(sql`
+      SELECT enum_range(NULL::website_rule)::text AS website_rule,
+             enum_range(NULL::website_source)::text AS website_source,
+             enum_range(NULL::registry_link_method)::text AS registry_link_method
+    `);
+    expect(row).toEqual({
+      website_rule: asPgArray(WEBSITE_RULES),
+      website_source: asPgArray(WEBSITE_SOURCES),
+      registry_link_method: asPgArray(REGISTRY_LINK_METHODS),
+    });
+  });
+
+  it("leaves existing rows untouched", async () => {
+    await expectRowsUntouchedBy(migrationFile("0005_"));
+  }, 30_000);
+
+  it("has no DROP, column type change or UPDATE", () => {
+    expectAdditiveOnly(migrationFile("0005_"));
+  });
+
+  it("allows one linked domain per company and one company per linked domain", async () => {
+    const first = await insertCompany("acme-robotics");
+    const second = await insertCompany("acmerobotics");
+    await insertWebsite(first.id, "acme.example", "linked");
+
+    expect(
+      await sqlState(
+        insertWebsite(first.id, "acme-robotics.example", "linked"),
+      ),
+    ).toBe(UNIQUE_VIOLATION);
+    expect(
+      await sqlState(insertWebsite(second.id, "acme.example", "linked")),
+    ).toBe(UNIQUE_VIOLATION);
+    expect(
+      await sqlState(insertWebsite(second.id, "acme.example", "candidate")),
+    ).toBeUndefined();
+    expect(
+      await sqlState(insertWebsite(first.id, "acme.example", "candidate")),
+    ).toBe(UNIQUE_VIOLATION);
+    expect(
+      await sqlState(
+        insertWebsite(first.id, "acme-robotics.example", "rejected"),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("rejects an upper-case domain, long evidence and more than 10 icons", async () => {
+    const company = await insertCompany();
+    const icon = {
+      url: "https://acme.example/favicon.ico",
+      rel: "favicon",
+      sizes: null,
+      type: null,
+    };
+
+    expect(
+      await sqlState(insertWebsite(company.id, "Acme.example", "rejected")),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        insertWebsite(company.id, "acme.example", "rejected", {
+          evidence: "x".repeat(301),
+        }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        insertWebsite(company.id, "acme.example", "candidate", {
+          iconCandidates: Array.from({ length: 11 }, () => icon),
+        }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    await insertWebsite(company.id, "acme.example", "candidate", {
+      iconCandidates: Array.from({ length: 10 }, () => icon),
+    });
+    const [row] = await db.select().from(companyWebsites);
+    expect(row?.iconCandidates).toHaveLength(10);
+    expect(row?.companyNumberSeen).toBeNull();
+  });
+
+  it("stores logo bytes and reads them back", async () => {
+    const company = await insertCompany();
+    await db.insert(companyLogos).values(logo(company.id));
+
+    const [row] = await db.select().from(companyLogos);
+    expect(row?.blocked).toBe(false);
+    expect(Array.from(row?.bytes ?? [])).toEqual(Array.from(logoBytes));
+  });
+
+  it("requires a complete raster image under 64 KB unless the logo is blocked", async () => {
+    const company = await insertCompany();
+    expect(
+      await sqlState(
+        db.insert(companyLogos).values({ ...logo(company.id), bytes: null }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        db
+          .insert(companyLogos)
+          .values({ ...logo(company.id), mime: "image/svg+xml" }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        db
+          .insert(companyLogos)
+          .values({ ...logo(company.id), bytes: new Uint8Array(65_537) }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        db.insert(companyLogos).values({ ...logo(company.id), sha256: "ABC" }),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlState(
+        db
+          .insert(companyLogos)
+          .values({ companyId: company.id, blocked: true }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("adds a nullable lower-case website to grant participants", async () => {
+    const [project] = await db
+      .insert(grantProjects)
+      .values({
+        sourceId: (await insertSource("ukri-gtr")).id,
+        gtrProjectId: "p1",
+        title: "Invented project",
+        grantCategory: "Collaborative R&D",
+        leadFunder: "Innovate UK",
+        status: "Active",
+        gtrUrl: "https://gtr.ukri.org/project/p1",
+      })
+      .returning();
+    const participant = (gtrOrgId: string, website: string | null) =>
+      db.insert(grantParticipants).values({
+        projectId: project!.id,
+        gtrOrgId,
+        organisationName: "Acme Robotics Ltd",
+        role: "lead",
+        website,
+      });
+
+    expect(await sqlState(participant("o1", null))).toBeUndefined();
+    expect(await sqlState(participant("o2", ""))).toBeUndefined();
+    expect(await sqlState(participant("o3", "acme.example"))).toBeUndefined();
+    expect(await sqlState(participant("o4", "Acme.example"))).toBe(
+      CHECK_VIOLATION,
+    );
+  });
+
+  it("grants the ingest role read and write, and the web role read only", async () => {
+    const client = await newPglite();
+    try {
+      await client.exec(
+        "CREATE ROLE signalfeed_ingest; CREATE ROLE signalfeed_web;",
+      );
+      await migrate(drizzle({ client }), {
+        migrationsFolder: MIGRATIONS_FOLDER,
+      });
+      const privileges = await client.query<Record<string, boolean>>(`
+        SELECT
+          has_table_privilege('signalfeed_ingest', 'company_websites', 'SELECT, INSERT, UPDATE, DELETE') AS ingest_websites,
+          has_table_privilege('signalfeed_ingest', 'company_logos', 'SELECT, INSERT, UPDATE, DELETE') AS ingest_logos,
+          has_sequence_privilege('signalfeed_ingest', 'company_websites_id_seq', 'USAGE') AS ingest_sequence,
+          has_table_privilege('signalfeed_web', 'company_websites', 'SELECT') AS web_reads_websites,
+          has_table_privilege('signalfeed_web', 'company_logos', 'SELECT') AS web_reads_logos,
+          has_table_privilege('signalfeed_web', 'company_websites', 'INSERT') AS web_writes_websites,
+          has_table_privilege('signalfeed_web', 'company_logos', 'UPDATE') AS web_writes_logos,
+          has_table_privilege('signalfeed_web', 'company_logos', 'DELETE') AS web_deletes_logos
+      `);
+      expect(privileges.rows[0]).toEqual({
+        ingest_websites: true,
+        ingest_logos: true,
+        ingest_sequence: true,
+        web_reads_websites: true,
+        web_reads_logos: true,
+        web_writes_websites: false,
+        web_writes_logos: false,
+        web_deletes_logos: false,
+      });
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
 });

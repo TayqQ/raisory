@@ -67,6 +67,9 @@ export const pipelineEnvSchema = z.object({
     .default(1500),
   MAX_EDGAR_DAYS_PER_RUN: z.coerce.number().int().positive().default(10),
   MAX_EDGAR_REQUESTS_PER_RUN: z.coerce.number().int().positive().default(3000),
+  // Company websites
+  /** Most pages read from company websites per run, manifests and legal pages included. */
+  MAX_WEBSITE_FETCHES_PER_RUN: z.coerce.number().int().positive().default(300),
 });
 export type PipelineEnv = z.infer<typeof pipelineEnvSchema>;
 

@@ -3,6 +3,7 @@ import type { GrantCollectStats } from "@/core/domain";
 import type { Db } from "@/db/client";
 import { grantParticipants, grantProjects, sources } from "@/db/schema";
 import { parseUkPostcode } from "@/lib/geo/postcode";
+import { registrableDomain } from "@/pipeline/websites/registrable-domain";
 import type { GtrClient } from "./gtr-client";
 import {
   mainAddress,
@@ -121,6 +122,8 @@ interface OrganisationDetails {
   postcode: string | null;
   outcode: string | null;
   regionText: string | null;
+  /** A registrable domain, or "" when GtR gives no usable website. */
+  website: string;
 }
 
 function organisationDetails(
@@ -134,9 +137,17 @@ function organisationDetails(
     postcode: parsed ? `${parsed.outcode} ${parsed.incode}` : null,
     outcode: parsed?.outcode ?? null,
     regionText: address?.region?.trim() || null,
+    website: registrableDomain(organisation.website) ?? "",
   };
 }
 
+/**
+ * Fetch details for organisations never fetched, up to the run's limit. The
+ * GtR `website` is stored as it comes. Organisations fetched before it was
+ * stored are not re-fetched for it: a sample of 100 on 23 November 2026 had
+ * no website in any record (A50 in `docs/sources.md`), so a re-fetch would
+ * cost GtR about 2,000 requests for nothing.
+ */
 async function fetchOrganisations(
   db: Db,
   gtr: GtrClient,
@@ -170,18 +181,16 @@ async function fetchOrganisations(
   }
   for (const id of eligible) skipped.delete(id);
   stats.orgsSkipped += skipped.size;
-  const pending = [...eligible].slice(0, maxOrgFetches).map((gtrOrgId) => ({
-    gtrOrgId,
-  }));
+  const pending = [...eligible].slice(0, maxOrgFetches);
 
   let failuresInARow = 0;
-  for (const { gtrOrgId } of pending) {
+  for (const gtrOrgId of pending) {
     let details: OrganisationDetails;
     try {
       details = organisationDetails(await gtr.getOrganisation(gtrOrgId));
       failuresInARow = 0;
     } catch (error) {
-      // Left unfetched, so the next run tries again.
+      // Left as it was, so the next run tries again.
       stats.orgsFailed += 1;
       failuresInARow += 1;
       if (failuresInARow >= STOP_AFTER_ORG_FAILURES) {

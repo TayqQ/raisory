@@ -324,6 +324,7 @@ const METHOD_LABELS: Record<RegistryLinkMethod, string> = {
   prefix_filing_location: "Name prefix, filing and location",
   form_d_round: "Form D and round",
   manual: "Manual",
+  website_number: "Company number on website",
 };
 
 function formatRecordKind(kind: RecordKind): string {

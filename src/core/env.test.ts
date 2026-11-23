@@ -44,6 +44,7 @@ describe("parsePipelineEnv", () => {
       MAX_CH_MINUTES_PER_RUN: 17,
       MAX_EDGAR_DAYS_PER_RUN: 10,
       MAX_EDGAR_REQUESTS_PER_RUN: 3000,
+      MAX_WEBSITE_FETCHES_PER_RUN: 300,
     });
   });
 
@@ -328,6 +329,18 @@ describe("grants speed settings and site indexing", () => {
       ).toThrow(ConfigError);
     },
   );
+
+  it("reads the website page cap and rejects one that is not a positive whole number", () => {
+    expect(
+      parsePipelineEnv({ ...secrets, MAX_WEBSITE_FETCHES_PER_RUN: "50" })
+        .MAX_WEBSITE_FETCHES_PER_RUN,
+    ).toBe(50);
+    for (const value of ["0", "-5", "1.5", "many"]) {
+      expect(() =>
+        parsePipelineEnv({ ...secrets, MAX_WEBSITE_FETCHES_PER_RUN: value }),
+      ).toThrow(ConfigError);
+    }
+  });
 
   it("treats SITE_INDEXING as optional in the web schema", () => {
     expect(parseWebEnv({ DATABASE_URL: "postgres://x" })).toEqual({

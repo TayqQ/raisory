@@ -30,6 +30,8 @@ import {
   THEME_ASSIGNED_BY,
   THEME_NAME_SOURCES,
   THEME_STATUSES,
+  WEBSITE_RULES,
+  WEBSITE_SOURCES,
 } from "./enums";
 
 type EnumCase = [string, readonly string[], readonly string[]];
@@ -175,6 +177,20 @@ const PHASE_3_NEW: EnumCase[] = [
   ["SECTOR_SOURCES", SECTOR_SOURCES, ["theme", "sic"]],
 ];
 
+// Company websites (migration 0005) append these values to Phase 3 enums.
+const WEBSITES_APPENDED: EnumCase[] = [
+  ["REGISTRY_LINK_METHODS", REGISTRY_LINK_METHODS, ["website_number"]],
+];
+
+const WEBSITES_NEW: EnumCase[] = [
+  [
+    "WEBSITE_RULES",
+    WEBSITE_RULES,
+    ["X1", "X2", "X3", "W1", "W2", "W3", "C1", "C2", "none", "manual"],
+  ],
+  ["WEBSITE_SOURCES", WEBSITE_SOURCES, ["article", "ukri", "name", "guess"]],
+];
+
 describe("enums", () => {
   it.each(BEFORE_PHASE_3)(
     "%s keeps its Phase 1 and Phase 2 values first, in order",
@@ -199,12 +215,24 @@ describe("enums", () => {
     }
   });
 
-  it.each(PHASE_3_NEW)("adds %s", (_name, actual, expected) => {
-    expect(actual).toEqual(expected);
+  it.each(PHASE_3_NEW)("adds %s", (name, actual, expected) => {
+    const later = WEBSITES_APPENDED.find(([n]) => n === name)?.[2] ?? [];
+    expect(actual).toEqual([...expected, ...later]);
   });
 
+  it.each(WEBSITES_NEW)(
+    "adds %s for company websites",
+    (_name, actual, expected) => {
+      expect(actual).toEqual(expected);
+    },
+  );
+
   it("has no duplicate values in any enum", () => {
-    for (const [name, values] of [...BEFORE_PHASE_3, ...PHASE_3_NEW]) {
+    for (const [name, values] of [
+      ...BEFORE_PHASE_3,
+      ...PHASE_3_NEW,
+      ...WEBSITES_NEW,
+    ]) {
       expect(new Set(values).size, name).toBe(values.length);
     }
   });

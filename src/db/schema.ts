@@ -5,6 +5,7 @@ import {
   boolean,
   char,
   check,
+  customType,
   date,
   index,
   integer,
@@ -53,6 +54,8 @@ import {
   THEME_ASSIGNED_BY,
   THEME_NAME_SOURCES,
   THEME_STATUSES,
+  WEBSITE_RULES,
+  WEBSITE_SOURCES,
 } from "@/core/enums";
 import type { ExtractionV1, ExtractionV2 } from "@/core/extraction-schema";
 import type { CapitalAmount } from "@/core/registry";
@@ -70,6 +73,10 @@ const countryCode = (name: string) => char(name, { length: 2 });
 const isoDate = (name: string) => date(name, { mode: "string" });
 const embedding = (name = "embedding") =>
   vector(name, { dimensions: EMBEDDING_DIMENSIONS });
+/** Raw bytes. PGlite returns a `Uint8Array`, node-postgres a `Buffer` (a subclass). */
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => "bytea",
+});
 
 // Enums
 
@@ -130,6 +137,11 @@ export const registrySearchOutcome = pgEnum(
   REGISTRY_SEARCH_OUTCOMES,
 );
 export const sectorSource = pgEnum("sector_source", SECTOR_SOURCES);
+
+// Company website enums (migration 0005)
+
+export const websiteRule = pgEnum("website_rule", WEBSITE_RULES);
+export const websiteSource = pgEnum("website_source", WEBSITE_SOURCES);
 
 // Collection and processing
 
@@ -869,6 +881,12 @@ export const grantParticipants = pgTable(
     grantOfferMinor: moneyMinor("grant_offer_minor"),
     projectCostMinor: moneyMinor("project_cost_minor"),
     orgFetchedAt: timestamptz("org_fetched_at"),
+    /**
+     * The organisation's website from GtR, as a registrable domain in lower
+     * case. An empty string means the fetch found no usable website; null
+     * means the organisation has not been fetched since this column was added.
+     */
+    website: text("website"),
     companyId: integer("company_id").references(() => companies.id),
     eventId: integer("event_id").references(() => events.id),
     resolvedAt: timestamptz("resolved_at"),
@@ -883,6 +901,10 @@ export const grantParticipants = pgTable(
     check(
       "grant_participants_amounts_non_negative",
       sql`${t.grantOfferMinor} >= 0 AND ${t.projectCostMinor} >= 0`,
+    ),
+    check(
+      "grant_participants_website_domain",
+      sql`${t.website} = lower(${t.website}) AND char_length(${t.website}) <= 253`,
     ),
   ],
 );
@@ -1183,6 +1205,103 @@ export const companySectors = pgTable(
   ],
 );
 
+// Company websites (migration 0005), used by the verification rules. Page text
+// is read in memory and never stored.
+
+/** Icon links read from a website's homepage, with their declared size and type. */
+export interface WebsiteIconCandidate {
+  url: string;
+  /** `json-ld`, `apple-touch-icon`, `manifest`, `icon` or `favicon`. */
+  rel: string;
+  /** As declared, such as "180x180", or null. */
+  sizes: string | null;
+  /** As declared, such as "image/png", or null. */
+  type: string | null;
+}
+
+export const companyWebsites = pgTable(
+  "company_websites",
+  {
+    id: id(),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    /** The registrable domain, in lower case. */
+    domain: text("domain").notNull(),
+    status: registryLinkStatus("status").notNull(),
+    rule: websiteRule("rule").notNull(),
+    source: websiteSource("source").notNull(),
+    /** Why the rule decided as it did, in at most 300 characters. */
+    evidence: text("evidence").notNull(),
+    /** A UK company number the site shows, when it shows one. */
+    companyNumberSeen: text("company_number_seen"),
+    iconCandidates: jsonb("icon_candidates")
+      .$type<WebsiteIconCandidate[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    checkedAt: timestamptz("checked_at").notNull(),
+    decidedBy: linkDecidedBy("decided_by").notNull(),
+    /** Hash of the company inputs the check used. */
+    fingerprint: text("fingerprint").notNull(),
+  },
+  (t) => [
+    unique("company_websites_company_domain_unique").on(t.companyId, t.domain),
+    uniqueIndex("company_websites_one_linked_per_domain_idx")
+      .on(t.domain)
+      .where(sql`${t.status} = 'linked'`),
+    uniqueIndex("company_websites_one_linked_per_company_idx")
+      .on(t.companyId)
+      .where(sql`${t.status} = 'linked'`),
+    check(
+      "company_websites_domain_lower",
+      sql`${t.domain} = lower(${t.domain})`,
+    ),
+    check(
+      "company_websites_evidence_length",
+      sql`char_length(${t.evidence}) <= 300`,
+    ),
+    check(
+      "company_websites_icon_candidates_max",
+      sql`jsonb_typeof(${t.iconCandidates}) = 'array' AND jsonb_array_length(${t.iconCandidates}) <= 10`,
+    ),
+  ],
+);
+
+/** A company's logo image, at most 64 KB, never SVG. A `blocked` row holds no image. */
+export const companyLogos = pgTable(
+  "company_logos",
+  {
+    companyId: integer("company_id")
+      .primaryKey()
+      .references(() => companies.id),
+    bytes: bytea("bytes"),
+    mime: text("mime"),
+    width: integer("width"),
+    height: integer("height"),
+    /** Lower-case hex SHA-256 of `bytes`. */
+    sha256: text("sha256"),
+    sourceUrl: text("source_url"),
+    fetchedAt: timestamptz("fetched_at"),
+    blocked: boolean("blocked").notNull().default(false),
+  },
+  (t) => [
+    check(
+      "company_logos_image_complete",
+      sql`${t.blocked} OR (${t.bytes} IS NOT NULL AND ${t.mime} IS NOT NULL AND ${t.width} IS NOT NULL AND ${t.height} IS NOT NULL AND ${t.sha256} IS NOT NULL AND ${t.sourceUrl} IS NOT NULL AND ${t.fetchedAt} IS NOT NULL)`,
+    ),
+    check("company_logos_bytes_max", sql`octet_length(${t.bytes}) <= 65536`),
+    check(
+      "company_logos_raster_mime",
+      sql`${t.mime} LIKE 'image/%' AND ${t.mime} <> 'image/svg+xml'`,
+    ),
+    check(
+      "company_logos_dimensions_positive",
+      sql`${t.width} > 0 AND ${t.height} > 0`,
+    ),
+    check("company_logos_sha256_hex", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
 // Relations
 
 export const sourcesRelations = relations(sources, ({ many }) => ({
@@ -1246,6 +1365,8 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   registrySearches: many(registrySearches),
   formDFilings: many(formDFilings),
   sectors: many(companySectors),
+  websites: many(companyWebsites),
+  logo: one(companyLogos),
   mergedInto: one(companies, {
     fields: [companies.mergedIntoId],
     references: [companies.id],
@@ -1546,6 +1667,23 @@ export const eventConfirmationsRelations = relations(
 export const companySectorsRelations = relations(companySectors, ({ one }) => ({
   company: one(companies, {
     fields: [companySectors.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const companyWebsitesRelations = relations(
+  companyWebsites,
+  ({ one }) => ({
+    company: one(companies, {
+      fields: [companyWebsites.companyId],
+      references: [companies.id],
+    }),
+  }),
+);
+
+export const companyLogosRelations = relations(companyLogos, ({ one }) => ({
+  company: one(companies, {
+    fields: [companyLogos.companyId],
     references: [companies.id],
   }),
 }));

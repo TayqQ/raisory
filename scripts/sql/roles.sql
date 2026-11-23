@@ -40,3 +40,8 @@ REVOKE ALL ON grant_project_texts FROM signalfeed_web;
 -- ch_companies.office_postcode is a company's public registered office. The web
 -- role keeps read access, as for grant_participants.postcode, but pages never
 -- display it; they show the postcode district.
+
+-- Company websites (migration 0005) need no new revoke. company_websites holds
+-- domains, rule outcomes and icon links, and company_logos holds a company's
+-- logo image: organisation facts only. The web role reads both, and the
+-- migration grants these privileges itself as well. Page text is never stored.

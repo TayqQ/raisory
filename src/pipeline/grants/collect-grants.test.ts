@@ -21,7 +21,7 @@ afterEach(async () => {
 
 function setup(
   pages: (page: number) => unknown,
-  options: { failOrgs?: string[]; postCode?: string } = {},
+  options: Parameters<typeof fakeGtr>[1] = {},
 ) {
   const fake = fakeGtr(pages, options);
   const gtr = createGtrClient({ http: fake.fetcher, sleep: vi.fn() });
@@ -53,6 +53,7 @@ describe("collectGrantsStep", () => {
         postcode: "L35 9JJ",
         outcode: "L35",
         regionText: "North West",
+        website: "example.com",
       });
       expect(row.orgFetchedAt).not.toBeNull();
     }
@@ -371,5 +372,20 @@ describe("collectGrantsStep retries and partial progress", () => {
     expect(stats.orgsFailed).toBe(3);
     expect(stats.errorCount).toBe(1);
     expect(stats.lastError).toContain("HTTP 500");
+  });
+});
+
+describe("organisation websites", () => {
+  it.each([
+    [null, ""],
+    ["N/A", ""],
+    ["info@example.org", ""],
+    ["HTTP://WWW.Shop.Example.CO.UK/about/", "example.co.uk"],
+    ["acme-robotics.example.com", "example.com"],
+  ])("stores GtR website %s as %j", async (website, stored) => {
+    const { gtr } = setup(fixturePage, { website });
+    await collectGrantsStep({ db: testDb.db, gtr, maxPages: 1 });
+    const rows = await testDb.db.select().from(grantParticipants);
+    expect(rows.map((row) => row.website)).toEqual([stored, stored, stored]);
   });
 });

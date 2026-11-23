@@ -191,6 +191,8 @@ export const REGISTRY_LINK_METHODS = [
   "prefix_filing_location",
   "form_d_round",
   "manual",
+  // Company websites (migration 0005), used by the verification rules.
+  "website_number",
 ] as const;
 export type RegistryLinkMethod = (typeof REGISTRY_LINK_METHODS)[number];
 
@@ -209,3 +211,32 @@ export type RegistrySearchOutcome = (typeof REGISTRY_SEARCH_OUTCOMES)[number];
 /** Where a row of `company_sectors` came from. */
 export const SECTOR_SOURCES = ["theme", "sic"] as const;
 export type SectorSource = (typeof SECTOR_SOURCES)[number];
+
+// Company website enums (migration 0005). Append only, as above.
+
+/**
+ * The verification rule that decided a `company_websites` row, used by the
+ * verification rules. `none` means no rule applied; `manual` is a
+ * maintainer's decision.
+ */
+export const WEBSITE_RULES = [
+  "X1",
+  "X2",
+  "X3",
+  "W1",
+  "W2",
+  "W3",
+  "C1",
+  "C2",
+  "none",
+  "manual",
+] as const;
+export type WebsiteRule = (typeof WEBSITE_RULES)[number];
+
+/**
+ * Where a candidate domain came from: the article, the company's own UKRI
+ * organisation record, the company name written as a domain, or a guess from
+ * the name.
+ */
+export const WEBSITE_SOURCES = ["article", "ukri", "name", "guess"] as const;
+export type WebsiteSource = (typeof WEBSITE_SOURCES)[number];

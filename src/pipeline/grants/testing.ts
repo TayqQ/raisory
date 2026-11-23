@@ -39,7 +39,12 @@ export interface FakeGtr {
  */
 export function fakeGtr(
   pages: (page: number) => unknown,
-  options: { failOrgs?: string[]; postCode?: string } = {},
+  options: {
+    failOrgs?: string[];
+    postCode?: string;
+    /** Replaces the fixture's website; null removes it. */
+    website?: string | null;
+  } = {},
 ): FakeGtr {
   const organisationTemplate = loadGtrFixture("organisation.json");
   const fake: FakeGtr = {
@@ -63,6 +68,9 @@ export function fakeGtr(
             id,
             name: `Org ${id}`,
           };
+          if (options.website !== undefined) {
+            organisation.website = options.website;
+          }
           if (options.postCode !== undefined) {
             organisation.addresses = {
               address: [
