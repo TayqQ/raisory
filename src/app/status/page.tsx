@@ -1,0 +1,739 @@
+import type { Metadata } from "next";
+import type {
+  EventType,
+  IngestStatus,
+  RecordKind,
+  SourceItemStatus,
+} from "@/core/enums";
+import {
+  EVENT_TYPES,
+  LLM_PURPOSES,
+  RECORD_KINDS,
+  REGISTRY_KINDS,
+  REGISTRY_LINK_METHODS,
+  SOURCE_ITEM_STATUSES,
+  type LlmPurpose,
+  type RegistryKind,
+  type RegistryLinkMethod,
+} from "@/core/enums";
+import type { IngestRunSummary } from "@/core/read-models";
+import {
+  getStatusSummary,
+  type Phase2Status,
+  type StatusReport,
+} from "@/db/queries/status";
+import { getWebDb } from "@/db/web";
+import { cached } from "@/lib/cached";
+import { formatMoneyShort } from "@/lib/format";
+
+/**
+ * Phones (under 768 px): each row stacks as a block, and each cell with a
+ * data-label shows "label ... value". The first cell (the name) has no label.
+ */
+const STACK_TABLE =
+  "max-md:block max-md:[&_thead]:hidden max-md:[&_tbody]:block max-md:[&_tr]:block max-md:[&_tr]:py-3 max-md:[&_td]:block max-md:[&_th]:block max-md:[&_td]:p-0 max-md:[&_th]:p-0 max-md:[&_[data-label]]:flex max-md:[&_[data-label]]:justify-between max-md:[&_[data-label]]:gap-4 max-md:[&_[data-label]]:py-0.5 max-md:[&_[data-label]]:text-right max-md:[&_[data-label]]:before:text-left max-md:[&_[data-label]]:before:text-muted max-md:[&_[data-label]]:before:content-[attr(data-label)]";
+
+export const metadata: Metadata = {
+  title: "Status",
+  description: "Pipeline health, ingest runs and LLM spend against the cap.",
+};
+
+/** What the budget guard uses when no rate is stored yet. */
+const FALLBACK_USD_PER_GBP = 1;
+
+export const dynamic = "force-dynamic";
+
+function loadStatus(): Promise<StatusReport> {
+  return cached(() => getStatusSummary(getWebDb()), ["status-summary"], {
+    revalidateSeconds: 60,
+  });
+}
+
+function formatUtcDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString("en-GB", {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatDurationMs(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rem = seconds % 60;
+  return rem === 0 ? `${minutes}m` : `${minutes}m ${rem}s`;
+}
+
+function runDuration(run: IngestRunSummary): string | null {
+  if (!run.finishedAt) return null;
+  const start = new Date(run.startedAt).getTime();
+  const end = new Date(run.finishedAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return formatDurationMs(end - start);
+}
+
+function formatUsdFromMicros(usdMicros: number): string {
+  const dollars = usdMicros / 1_000_000;
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(dollars);
+}
+
+function gbpMinorFromUsdMicros(usdMicros: number, usdPerGbp: number): number {
+  const gbp = usdMicros / 1_000_000 / usdPerGbp;
+  return Math.round(gbp * 100);
+}
+
+function capUsdMicros(capGbp: number, usdPerGbp: number): number {
+  return Math.floor(capGbp * usdPerGbp * 1_000_000);
+}
+
+function formatIngestStatus(status: IngestStatus): string {
+  switch (status) {
+    case "running":
+      return "Running";
+    case "succeeded":
+      return "Succeeded";
+    case "failed":
+      return "Failed";
+    case "budget_paused":
+      return "Budget paused";
+    default: {
+      const exhaustive: never = status;
+      return exhaustive;
+    }
+  }
+}
+
+function formatItemStatus(status: SourceItemStatus): string {
+  switch (status) {
+    case "pending":
+      return "Pending";
+    case "filtered_out":
+      return "Filtered out";
+    case "extracted":
+      return "Extracted";
+    case "failed":
+      return "Failed";
+    default: {
+      const exhaustive: never = status;
+      return exhaustive;
+    }
+  }
+}
+
+function formatEventType(type: EventType): string {
+  switch (type) {
+    case "funding_round":
+      return "Funding rounds";
+    case "acquisition":
+      return "Acquisitions";
+    case "launch":
+      return "Launches";
+    default: {
+      const exhaustive: never = type;
+      return exhaustive;
+    }
+  }
+}
+
+function statusBadgeClass(status: IngestStatus): string {
+  switch (status) {
+    case "succeeded":
+      return "bg-up-soft text-up";
+    case "running":
+      return "bg-brand-soft text-brand";
+    case "failed":
+      return "bg-down-soft text-down";
+    case "budget_paused":
+      return "bg-warn-soft text-warn";
+    default:
+      return "bg-surface-sunk text-ink";
+  }
+}
+
+function formatPurpose(purpose: LlmPurpose): string {
+  switch (purpose) {
+    case "extraction":
+      return "Extraction";
+    case "embedding":
+      return "Embedding";
+    case "theme_naming":
+      return "Theme naming";
+    case "tagging":
+      return "Tagging";
+    case "eval":
+      return "Eval";
+    case "document_reading":
+      return "Document reading";
+    default: {
+      const exhaustive: never = purpose;
+      return exhaustive;
+    }
+  }
+}
+
+function SpendByPurpose({ summary }: { summary: StatusReport }) {
+  const byPurpose = summary.phase2.spendByPurposeUsdMicros;
+  return (
+    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {LLM_PURPOSES.map((purpose) => (
+        <div
+          key={purpose}
+          className="rounded-lg border border-line bg-surface-sunk px-3 py-2"
+        >
+          <dt className="text-xs text-muted">{formatPurpose(purpose)}</dt>
+          <dd className="text-lg font-semibold tabular-nums text-ink">
+            {formatUsdFromMicros(byPurpose[purpose])}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function StatGrid({
+  items,
+}: {
+  items: { label: string; value: string | number }[];
+}) {
+  return (
+    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="rounded-lg border border-line bg-surface-sunk px-3 py-2"
+        >
+          <dt className="text-xs text-muted">{item.label}</dt>
+          <dd className="text-lg font-semibold tabular-nums text-ink">
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function formatWhen(iso: string | null): string {
+  return iso ? formatUtcDateTime(iso) : "Never";
+}
+
+function Phase2Sections({ phase2 }: { phase2: Phase2Status }) {
+  const run = phase2.latestGrantsRun;
+  return (
+    <>
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">Tags and themes</h2>
+        <p className="mt-1 text-sm text-muted">
+          Pending tags wait for the next embedding run. Unnamed themes still
+          carry the label of their first tag. Unreviewed themes have not been
+          checked by a person.
+        </p>
+        <StatGrid
+          items={[
+            { label: "Tags embedded", value: phase2.tags.embedded },
+            { label: "Tags pending", value: phase2.tags.pending },
+            { label: "Active themes", value: phase2.themes.active },
+            { label: "Unnamed themes", value: phase2.themes.unnamed },
+            { label: "Unreviewed themes", value: phase2.themes.unreviewed },
+          ]}
+        />
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">Grants</h2>
+        <p className="mt-1 text-sm text-muted">
+          Innovate UK projects from UKRI Gateway to Research. Skipped
+          participants have no grant offer or start date. Organisations that may
+          be individuals are never stored.
+        </p>
+        <StatGrid
+          items={[
+            { label: "Grant projects", value: phase2.grants.projects },
+            { label: "Kept", value: phase2.grants.participantsKept },
+            { label: "Skipped", value: phase2.grants.participantsSkipped },
+            {
+              label: "Unresolved",
+              value: phase2.grants.participantsUnresolved,
+            },
+          ]}
+        />
+        {run ? (
+          <p className="mt-3 text-sm text-ink">
+            Latest grants run: {formatUtcDateTime(run.startedAt)} UTC (
+            {formatIngestStatus(run.status).toLowerCase()})
+            {run.collect
+              ? `, ${run.collect.projectsInserted} new projects and ${run.collect.participantsSkipped} participants left out as not organisations`
+              : ""}
+            {run.resolve
+              ? `, ${run.resolve.eventsCreated} grant events created`
+              : ""}
+            .
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-muted">
+            The grants collector has not run yet.
+          </p>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">Derived data</h2>
+        <p className="mt-1 text-sm text-muted">
+          Trend figures and locations are rebuilt from stored events. A rebuild
+          is skipped when nothing has changed, so an old time is not a fault.
+        </p>
+        <StatGrid
+          items={[
+            {
+              label: "Trend stats rebuilt (UTC)",
+              value: formatWhen(phase2.statsRebuiltAt),
+            },
+            {
+              label: "Locations rebuilt (UTC)",
+              value: formatWhen(phase2.locationsRebuiltAt),
+            },
+          ]}
+        />
+      </section>
+    </>
+  );
+}
+
+const REGISTRY_LABELS: Record<RegistryKind, string> = {
+  companies_house: "Companies House",
+  sec_edgar: "SEC EDGAR",
+};
+
+const METHOD_LABELS: Record<RegistryLinkMethod, string> = {
+  grant_number: "Grant number",
+  name_grant_postcode: "Name and grant postcode",
+  name_filing: "Name and filing",
+  name_location: "Name and location",
+  prefix_filing_location: "Name prefix, filing and location",
+  form_d_round: "Form D and round",
+  manual: "Manual",
+};
+
+function formatRecordKind(kind: RecordKind): string {
+  switch (kind) {
+    case "ukri_grant":
+      return "Grant records";
+    case "ch_allotment":
+      return "SH01 allotments";
+    case "sec_form_d":
+      return "Form D filings";
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function RegistrySections({ summary }: { summary: StatusReport }) {
+  const { registry, formD, confirmations } = summary;
+  const run = registry.lastRun;
+  return (
+    <section className="mt-10">
+      <h2 className="text-xl font-semibold">Registry and filings</h2>
+      <p className="mt-1 text-sm text-muted">
+        Open candidates wait for a person to review them. A &ldquo;confirmed
+        news event&rdquo; is a news round that an official filing matches.
+      </p>
+      <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+        <table className={`w-full text-left text-sm ${STACK_TABLE}`}>
+          <thead className="bg-surface-sunk text-muted">
+            <tr>
+              <th className="px-3 py-2 font-medium">Registry</th>
+              <th className="px-3 py-2 font-medium text-right">Linked</th>
+              <th className="px-3 py-2 font-medium text-right">
+                Open candidates
+              </th>
+              <th className="px-3 py-2 font-medium text-right">Rejected</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {REGISTRY_KINDS.map((kind) => {
+              const counts = registry.links[kind].byStatus;
+              return (
+                <tr key={kind} className="text-ink">
+                  <td className="px-3 py-2">{REGISTRY_LABELS[kind]}</td>
+                  <td
+                    data-label="Linked"
+                    className="px-3 py-2 text-right tabular-nums"
+                  >
+                    {counts.linked}
+                  </td>
+                  <td
+                    data-label="Open candidates"
+                    className="px-3 py-2 text-right tabular-nums"
+                  >
+                    {counts.candidate}
+                  </td>
+                  <td
+                    data-label="Rejected"
+                    className="px-3 py-2 text-right tabular-nums"
+                  >
+                    {counts.rejected}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="mt-6 text-sm font-medium text-ink">Links by method</h3>
+      <div className="mt-2 overflow-x-auto rounded-lg border border-line">
+        <table className={`w-full text-left text-sm ${STACK_TABLE}`}>
+          <thead className="bg-surface-sunk text-muted">
+            <tr>
+              <th className="px-3 py-2 font-medium">Method</th>
+              {REGISTRY_KINDS.map((kind) => (
+                <th key={kind} className="px-3 py-2 font-medium text-right">
+                  {REGISTRY_LABELS[kind]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {REGISTRY_LINK_METHODS.map((method) => (
+              <tr key={method} className="text-ink">
+                <td className="px-3 py-2">{METHOD_LABELS[method]}</td>
+                {REGISTRY_KINDS.map((kind) => (
+                  <td
+                    key={kind}
+                    data-label={REGISTRY_LABELS[kind]}
+                    className="px-3 py-2 text-right tabular-nums"
+                  >
+                    {registry.links[kind].linkedByMethod[method]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="mt-6 text-sm font-medium text-ink">Companies House</h3>
+      <StatGrid
+        items={[
+          { label: "Searched, no match", value: registry.searchedNoMatch },
+          {
+            label: "Profiles older than 90 days",
+            value: registry.profilesOlderThan90Days,
+          },
+          {
+            label: "Last run requests",
+            value: run ? run.requests : "No run yet",
+          },
+          {
+            label: "Last run profiles refreshed",
+            value: run ? run.profilesRefreshed : "No run yet",
+          },
+        ]}
+      />
+      {run?.skipped ? (
+        <p className="mt-3 text-sm text-ink">
+          The last registry run was skipped because no Companies House key is
+          set.
+        </p>
+      ) : null}
+      {run?.stoppedAtLimit ? (
+        <p className="mt-3 text-sm text-warn">
+          The last registry run stopped at its request limit. The rest waits for
+          the next run.
+        </p>
+      ) : null}
+      {run?.rateLimited ? (
+        <p className="mt-3 text-sm text-warn">
+          Companies House answered &ldquo;too many requests&rdquo; (429) in the
+          last registry run, and the run stopped.
+        </p>
+      ) : null}
+
+      <h3 className="mt-6 text-sm font-medium text-ink">SEC Form D</h3>
+      <StatGrid
+        items={[
+          {
+            label: "Last index day done (UTC)",
+            value: formD.lastDoneDay ?? "Never",
+          },
+          { label: "Filings stored", value: formD.filingsStored },
+          { label: "Funds skipped", value: formD.fundsSkipped },
+          { label: "Filings linked to a company", value: formD.filingsLinked },
+        ]}
+      />
+
+      <h3 className="mt-6 text-sm font-medium text-ink">Confirmations</h3>
+      <StatGrid
+        items={[
+          ...RECORD_KINDS.map((kind) => ({
+            label: formatRecordKind(kind),
+            value: confirmations.byRecordKind[kind],
+          })),
+          {
+            label: "News events confirmed",
+            value: confirmations.newsEventsConfirmed,
+          },
+        ]}
+      />
+    </section>
+  );
+}
+
+function SpendSection({ summary }: { summary: StatusReport }) {
+  const { monthToDateUsdMicros, capGbp } = summary;
+  const usdPerGbp = summary.usdPerGbp ?? FALLBACK_USD_PER_GBP;
+  const gbpMinor = gbpMinorFromUsdMicros(monthToDateUsdMicros, usdPerGbp);
+
+  if (capGbp == null) {
+    return (
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">LLM spend this month</h2>
+        <p className="mt-3 text-muted">
+          Spend tracking appears after the first ingest run completes.
+        </p>
+      </section>
+    );
+  }
+
+  const capMicros = capUsdMicros(capGbp, usdPerGbp);
+  const pct =
+    capMicros > 0 ? Math.min(100, (monthToDateUsdMicros / capMicros) * 100) : 0;
+
+  return (
+    <section className="mt-10">
+      <h2 className="text-xl font-semibold">LLM spend this month</h2>
+      <p className="mt-3 text-ink">
+        {formatMoneyShort(gbpMinor, "GBP")} and{" "}
+        {formatUsdFromMicros(monthToDateUsdMicros)} month-to-date, against a{" "}
+        {formatMoneyShort(capGbp * 100, "GBP")} (
+        {formatUsdFromMicros(capMicros)}) cap
+      </p>
+      <div
+        className="mt-4 h-3 w-full overflow-hidden rounded-full bg-line"
+        role="progressbar"
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Month-to-date LLM spend against cap"
+      >
+        <div
+          className="h-full rounded-full bg-brand transition-[width]"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <h3 className="mt-6 text-sm font-medium text-ink">By purpose</h3>
+      <SpendByPurpose summary={summary} />
+    </section>
+  );
+}
+
+function RunsTable({ runs }: { runs: IngestRunSummary[] }) {
+  return (
+    <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+      <table className={`w-full text-left text-sm ${STACK_TABLE}`}>
+        <thead className="bg-surface-sunk text-muted">
+          <tr>
+            <th className="px-3 py-2 font-medium">Started (UTC)</th>
+            <th className="px-3 py-2 font-medium">Duration</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium text-right">Collected</th>
+            <th className="px-3 py-2 font-medium text-right">Extracted</th>
+            <th className="px-3 py-2 font-medium text-right">Run spend</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {runs.map((run) => {
+            const stats = run.stats;
+            const collected = stats?.collect.itemsInserted ?? null;
+            const extracted = stats?.extract.itemsExtracted ?? null;
+            const spend = stats?.spendUsdMicros ?? null;
+            const duration = runDuration(run);
+
+            return (
+              <tr key={run.id} className="text-ink">
+                <td className="whitespace-nowrap px-3 py-2">
+                  {formatUtcDateTime(run.startedAt)}
+                </td>
+                <td data-label="Duration" className="px-3 py-2">
+                  {duration ?? "—"}
+                </td>
+                <td data-label="Status" className="px-3 py-2">
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(run.status)}`}
+                  >
+                    {formatIngestStatus(run.status)}
+                  </span>
+                </td>
+                <td
+                  data-label="Collected"
+                  className="px-3 py-2 text-right tabular-nums"
+                >
+                  {collected ?? "—"}
+                </td>
+                <td
+                  data-label="Extracted"
+                  className="px-3 py-2 text-right tabular-nums"
+                >
+                  {extracted ?? "—"}
+                </td>
+                <td
+                  data-label="Run spend"
+                  className="px-3 py-2 text-right tabular-nums"
+                >
+                  {spend != null ? formatUsdFromMicros(spend) : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CountGrid({
+  title,
+  labels,
+  counts,
+}: {
+  title: string;
+  labels: Record<string, string>;
+  counts: Record<string, number>;
+}) {
+  const keys = Object.keys(labels);
+  return (
+    <section className="mt-10">
+      <h2 className="text-xl font-semibold">{title}</h2>
+      <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {keys.map((key) => (
+          <div
+            key={key}
+            className="rounded-lg border border-line bg-surface-sunk px-3 py-2"
+          >
+            <dt className="text-xs text-muted">{labels[key]}</dt>
+            <dd className="text-lg font-semibold tabular-nums text-ink">
+              {counts[key] ?? 0}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+export default async function StatusPage() {
+  const summary = await loadStatus();
+  const latest = summary.recentRuns[0];
+  const budgetPaused = latest?.status === "budget_paused";
+  const empty = summary.recentRuns.length === 0;
+
+  const itemLabels = Object.fromEntries(
+    SOURCE_ITEM_STATUSES.map((s) => [s, formatItemStatus(s)]),
+  ) as Record<SourceItemStatus, string>;
+
+  const eventLabels = Object.fromEntries(
+    EVENT_TYPES.map((t) => [t, formatEventType(t)]),
+  ) as Record<EventType, string>;
+
+  return (
+    <main className="text-ink">
+      <h1 className="sr-only">Status</h1>
+      <p className="text-[13px] text-muted">
+        Ingestion health, item and event counts, and language-model spend
+        against the monthly cap. Cached for about 60 seconds.
+      </p>
+
+      {budgetPaused ? (
+        <div
+          className="mt-6 rounded-lg border border-warn bg-warn-soft px-4 py-3 text-warn"
+          role="status"
+        >
+          <p className="font-medium">Budget paused</p>
+          <p className="mt-1 text-sm">
+            The latest ingest run hit the monthly LLM spend cap. New extractions
+            are paused until the next calendar month or the cap is raised;
+            pending items stay in the queue.
+          </p>
+        </div>
+      ) : null}
+
+      {latest?.stats?.extract.skipped ? (
+        <div
+          className="mt-6 rounded-lg border border-line-strong bg-surface-sunk px-4 py-3"
+          role="status"
+        >
+          <p className="font-medium">Extraction is off</p>
+          <p className="mt-1 text-sm">
+            Feeds are being collected and kept, but no language model key is
+            set, so they are not being turned into events yet.
+          </p>
+        </div>
+      ) : null}
+
+      {latest?.stats?.extract.providerError ? (
+        <div
+          className="mt-6 rounded-lg border border-down bg-down-soft px-4 py-3"
+          role="status"
+        >
+          <p className="font-medium">The language model provider refused</p>
+          <p className="mt-1 text-sm">
+            Items stay in the queue and will be retried on the next run.
+          </p>
+        </div>
+      ) : null}
+
+      {empty ? (
+        <div className="mt-10 rounded-lg border border-dashed border-line-strong bg-surface-sunk px-6 py-10 text-center">
+          <p className="text-lg font-medium text-ink">No ingest runs yet</p>
+          <p className="mt-2 text-muted">
+            Scheduled collection has not recorded a run. After the first
+            pipeline run, recent activity and spend will appear here.
+          </p>
+        </div>
+      ) : (
+        <>
+          <section className="mt-10">
+            <h2 className="text-xl font-semibold">Recent ingest runs</h2>
+            <p className="mt-1 text-sm text-muted">
+              Last {summary.recentRuns.length} runs, newest first.
+            </p>
+            <RunsTable runs={summary.recentRuns} />
+          </section>
+
+          <SpendSection summary={summary} />
+        </>
+      )}
+
+      {!empty ? (
+        <>
+          <CountGrid
+            title="Source items by status"
+            labels={itemLabels}
+            counts={summary.itemCountsByStatus}
+          />
+          <CountGrid
+            title="Events by type"
+            labels={eventLabels}
+            counts={summary.eventCountsByType}
+          />
+          <Phase2Sections phase2={summary.phase2} />
+          <RegistrySections summary={summary} />
+        </>
+      ) : null}
+    </main>
+  );
+}
