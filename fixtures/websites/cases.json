@@ -1,0 +1,1562 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "web-01",
+      "tags": ["true-site", "company-number"],
+      "note": "Payhawk's own site. The footer shows a UK company number; the company has no Companies House link, so only the name and the LLM check decide.",
+      "company": {
+        "id": 2352,
+        "name": "Payhawk",
+        "countryCode": "GB",
+        "city": "London",
+        "description": "Enterprise financial management platform helping companies track and manage expenses and procurement using AI agents."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "payhawk.com",
+        "title": "AI-Powered Platform for Spend Management & Finance Orchestration | Payhawk",
+        "ogTitle": "AI-Powered Platform for Spend Management & Finance Orchestration | Payhawk",
+        "metaDescription": "Unify all business spend in one AI-powered spend management platform, combining corporate cards, expense management, accounts payable, procurement and travel management.",
+        "text": "Company number 11747263. The Payhawk Visa Debit card and Payhawk Visa Credit cards are issued pursuant to a license from Visa.",
+        "companyNumbers": ["11747263"]
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-02",
+      "tags": ["true-site"],
+      "note": "Mistral AI's own site.",
+      "company": {
+        "id": 2385,
+        "name": "Mistral",
+        "countryCode": "FR",
+        "description": "French AI unicorn Mistral received an additional €100 million investment from Deutsche Telekom’s investment arm, T.Capital Tech Fund, as part of its Series D."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "mistral.ai",
+        "title": "Mistral | #1 in Sovereign AI: Frontier Open Models You Own",
+        "siteName": "Mistral",
+        "ogTitle": "Mistral | #1 in Sovereign AI: Frontier Open Models You Own",
+        "metaDescription": "Mistral AI builds frontier open-weight models you own. Customize with Forge, deploy agents with Studio, run on-prem, your VPC, or our European sovereign cloud.",
+        "text": "Company Terms of Service Privacy Policy Legal notice Mistral AI © 2026"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-03",
+      "tags": ["true-site"],
+      "note": "Bending Spoons' own site. The footer shows an Italian registration number, which is not a UK company number.",
+      "company": {
+        "id": 2383,
+        "name": "Bending Spoons",
+        "countryCode": "IT",
+        "city": "Milan",
+        "description": "Milan-based technology company that acquires and transforms digital businesses."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "bendingspoons.com",
+        "title": "Bending Spoons | Impossible. Maybe.",
+        "siteName": "Bending Spoons",
+        "ogTitle": "Bending Spoons",
+        "metaDescription": "Bending Spoons acquires and improves iconic products, and integrates them into a central operating system of people, data, and technologies.",
+        "text": "VAT, tax code, and number of registration with the Milan Monza Brianza Lodi Company Register 13368510965. Headquarters Milan, Italy."
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-04",
+      "tags": ["true-site"],
+      "note": "Isomorphic Labs' own site. Contact addresses removed from the footer.",
+      "company": {
+        "id": 2344,
+        "name": "Isomorphic Labs",
+        "description": "AI company designing and developing new medicines using proprietary AI advances."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "isomorphiclabs.com",
+        "title": "Reimagining Drug Discovery Process with AI - Isomorphic Labs",
+        "ogTitle": "Reimagining Drug Discovery Process with AI - Isomorphic Labs",
+        "metaDescription": "Isomorphic Labs is building a future where frontier AI can help to unlock deeper scientific insights, faster breakthroughs, and life-changing medicines.",
+        "text": "2026 ISOMORPHIC LABS Home Life at Iso Our Tech Job Openings Partnerships News Privacy Notice Cookie Notice Terms & Conditions"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-05",
+      "tags": ["true-site"],
+      "note": "Fresha's own site. Our description covers a lending programme for the same beauty and wellness businesses the platform serves.",
+      "company": {
+        "id": 2366,
+        "name": "Fresha",
+        "description": "Lending programme providing more than $20m to beauty and wellness businesses, developed with Adyen."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "fresha.com",
+        "title": "Fresha - Instantly book salons and spas nearby",
+        "siteName": "Fresha - Instantly book salons and spas nearby",
+        "metaDescription": "Find the best salons and spa in your area with Fresha salon booking software. Book now!",
+        "text": "Popular: hair salons, medspas, spas and saunas."
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-06",
+      "tags": ["true-site"],
+      "note": "Taalas' own site. Contact address removed from the footer.",
+      "company": {
+        "id": 2394,
+        "name": "Taalas",
+        "countryCode": "CA",
+        "city": "Toronto",
+        "description": "Toronto-based, CEE-founded startup developing AI inference silicon that hardwires single models for speed and efficiency."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "taalas.com",
+        "title": "Taalas | The model is The Computer",
+        "siteName": "Taalas",
+        "ogTitle": "Taalas | The model is The Computer",
+        "metaDescription": "We are creating a platform that makes it easy to turn any deep learning model into custom silicon quickly.",
+        "text": "© Taalas 2026. All rights reserved. Privacy Policy Terms & Conditions"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-07",
+      "tags": ["true-site"],
+      "note": "Gradyent's own site.",
+      "company": {
+        "id": 2384,
+        "name": "Gradyent",
+        "countryCode": "NL",
+        "city": "Rotterdam",
+        "description": "Rotterdam-based SaaS provider for digital optimisation of district heating, cooling, and industrial networks."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "gradyent.ai",
+        "title": "Gradyent - Upgrade your Heating grid with our powerful Digital Twin",
+        "ogTitle": "Gradyent - Upgrade your Heating grid with our powerful Digital Twin",
+        "metaDescription": "By enabling you to optimise, decarbonise and transform your Heating system, we help you to take on the climate challenge and progress.",
+        "text": "Our platform lets you optimise your grid from production to network and end users in real-time. Discover our Digital Twin Solutions for Industrial Heating."
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-08",
+      "tags": ["true-site"],
+      "note": "Hone Health's own site. Our description only gives the round; the page's longevity clinic fits it.",
+      "company": {
+        "id": 2362,
+        "name": "Hone Health",
+        "description": "Hone Health raised $228M in a longevity funding round."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "honehealth.com",
+        "title": "Hone Health: A Telehealth Clinic Unlocking Energy and Longevity",
+        "siteName": "Hone Health",
+        "ogTitle": "Hone Health: A Telehealth Clinic Unlocking Energy and Longevity",
+        "metaDescription": "Hone Health is a telehealth clinic that helps people improve healthspan through advanced biomarker testing, clinician-guided care, and personalized protocols.",
+        "text": "Privacy Policy. Your Privacy Choices."
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-09",
+      "tags": ["true-site"],
+      "note": "Model ML's own site. The company has a Companies House link, but the homepage shows no number, so X2 and W1 do not apply.",
+      "company": {
+        "id": 2345,
+        "name": "Model ML",
+        "countryCode": "GB",
+        "city": "London",
+        "description": "London-based AI platform developing personalised agents for financial and professional services.",
+        "linkedCompanyNumber": "15457118"
+      },
+      "source": "guess",
+      "page": {
+        "domain": "modelml.com",
+        "title": "Model ML",
+        "ogTitle": "Model ML",
+        "metaDescription": "Model ML is your Finance Agent wherever you are, whenever you need it. Trusted by the world's leading financial institutions.",
+        "text": "Company About Us Careers Blog Legal Privacy Policy Terms of Service New York San Francisco London Hong Kong © 2026 Model ML. All rights reserved."
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-10",
+      "tags": ["true-site"],
+      "note": "Ranketta's own site.",
+      "company": {
+        "id": 2376,
+        "name": "Ranketta",
+        "countryCode": "CZ",
+        "description": "Czech-founded startup helping e-commerce brands track whether their products appear in AI recommendations."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "ranketta.com",
+        "title": "Ranketta - Become the product AI recommends",
+        "siteName": "Ranketta",
+        "ogTitle": "Ranketta - Become the product AI recommends",
+        "metaDescription": "Ranketta is merchandising and analytics for AI shopping. Track how your products appear across ChatGPT, Perplexity, Google AI Overviews, and other major AI engines, merchandise your catalog to close the gaps, and connect your feed directly to the AI engines that recommend it.",
+        "text": "Company About Careers Contact © 2026 Ranketta. All rights reserved. Privacy Terms Cookies"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-11",
+      "tags": ["true-site", "title-separator"],
+      "note": "Anthropic's own site. The title uses a backslash as its separator.",
+      "company": {
+        "id": 2358,
+        "name": "Anthropic",
+        "description": "AI company behind Claude"
+      },
+      "source": "guess",
+      "page": {
+        "domain": "anthropic.com",
+        "title": "Home \\ Anthropic",
+        "ogTitle": "Home",
+        "metaDescription": "Anthropic is an AI safety and research company that's working to build reliable, interpretable, and steerable AI systems.",
+        "text": "Anthropic is a Public Benefit Corporation. Log in Claude.ai Claude console © 2026 Anthropic PBC"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-12",
+      "tags": ["true-site", "redirect"],
+      "note": "The guessed domain redirects to the company's shorter domain. The footer shows a Danish CVR number, not a UK one.",
+      "company": {
+        "id": 2347,
+        "name": "Commit Biologics",
+        "countryCode": "DK",
+        "city": "Copenhagen",
+        "description": "Copenhagen-based biotech company developing treatments for cancer and autoimmune diseases."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "commitbiologics.com",
+        "finalDomain": "commitbio.com",
+        "redirectedFrom": "commitbiologics.com",
+        "title": "Commit Biologics – The Complement-Powered Immune Engagers Company",
+        "siteName": "Commit Biologics",
+        "ogTitle": "Commit Biologics",
+        "metaDescription": "Add a description about your page or projects. Should be around 135 to 160 characters.",
+        "text": "Commit Biologics achieves proof-of-concept for novel Complement Engager platform in non-human primates. Commit Biologics CVR no.: 42642649"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-13",
+      "tags": ["true-site", "redirect"],
+      "note": "The guessed domain redirects to the company's own domain. Phone, email and street address removed from the footer.",
+      "company": {
+        "id": 2365,
+        "name": "etiCloud",
+        "countryCode": "GB",
+        "city": "Sheffield",
+        "description": "Sheffield cloud provider serving law firms.",
+        "linkedCompanyNumber": "09777907"
+      },
+      "source": "guess",
+      "page": {
+        "domain": "eticloud.co.uk",
+        "finalDomain": "everythingthatis.cloud",
+        "redirectedFrom": "eticloud.co.uk",
+        "title": "etiCloud | Everything that is Cloud",
+        "text": "Case Studies Blog Contact Careers at etiCloud. Talk to our team today. etiCloud Ltd, Sheffield. Data Processing Agreement Terms & Conditions"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-14",
+      "tags": ["true-site", "company-number", "ukri"],
+      "note": "The footer shows the company's own Scottish company number. Footer abridged to the number and its cue.",
+      "company": {
+        "id": 2316,
+        "name": "NCIMB LIMITED",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "SC078368"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "ncimb.com",
+        "title": "NCIMB | Microbiology | Analytical Services | Biomaterial Storage",
+        "text": "Company number SC078368.",
+        "companyNumbers": ["SC078368"]
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-15",
+      "tags": ["true-site", "company-number", "ukri"],
+      "note": "The footer shows the company's own company number. Footer abridged to the number and its cue.",
+      "company": {
+        "id": 2301,
+        "name": "TAPOLY LTD",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "10340563"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "tapoly.com",
+        "title": "Tapoly | Business Insurance for SMEs and Freelancers",
+        "siteName": "Tapoly",
+        "ogTitle": "Tapoly | Business Insurance for SMEs and Freelancers",
+        "metaDescription": "Award winning business insurance from Tapoly. Get a tailored quote for professional indemnity, public liability, and more today.",
+        "text": "Company number 10340563.",
+        "companyNumbers": ["10340563"]
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-16",
+      "tags": ["true-site", "ukri"],
+      "note": "The company's open-source project site, given by its own UKRI record. No company number on the page.",
+      "company": {
+        "id": 2318,
+        "name": "P2PANDA LTD",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "15492114"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "p2panda.org",
+        "title": "p2panda",
+        "ogTitle": "p2panda",
+        "metaDescription": "Building blocks for peer-to-peer applications",
+        "text": "This project has received funding from the European Union's Horizon 2020 research and innovation programme. CC BY-SA 4.0 - Contact - RSS - GitHub"
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-17",
+      "tags": ["true-site", "article"],
+      "note": "The article printed this domain. A single-word name, but the stated source and the name match link it (W2).",
+      "company": {
+        "id": 2378,
+        "name": "Science",
+        "countryCode": "US",
+        "description": "Brain-computer interface company that secured a fresh $400 million funding round."
+      },
+      "source": "article",
+      "page": {
+        "domain": "science.xyz",
+        "title": "Science | Science Corporation",
+        "siteName": "Science Corporation",
+        "ogTitle": "Science | Science Corporation",
+        "metaDescription": "Science Corporation is a clinical-stage medical technology company.",
+        "text": "Neural Engineering. Patients: Macular Degeneration, Retinitis Pigmentosa. © 2026 Science Corporation Terms of Use Privacy"
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-18",
+      "tags": ["true-site", "article", "no-name-match"],
+      "note": "The company's own site, but the title shows \"Disseqt\" without \"AI\", so the name does not match and it goes to review (C2).",
+      "company": {
+        "id": 2353,
+        "name": "Disseqt AI",
+        "countryCode": "IE",
+        "city": "Dublin",
+        "description": "Dublin-based AI assurance platform helping enterprises deploy AI agents safely at scale and meet regulatory requirements."
+      },
+      "source": "article",
+      "page": {
+        "domain": "disseqt.ai",
+        "title": "AI Assurance Platform for Enterprise AI Ops | Disseqt",
+        "ogTitle": "AI Assurance Platform for Enterprise AI Ops | Disseqt",
+        "metaDescription": "The only unified AI assurance platform for enterprise AI operations. Test, protect, and prove with audit-ready evidence regulators accept.",
+        "text": "AI Governance Glossary. AI Risk Management. ISO/IEC 42001. © DISSEQT AI LIMITED"
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-19",
+      "tags": ["redirect", "ukri", "no-name-match"],
+      "note": "Paxman scalp cooling for chemotherapy side effects: Paxman Coolers Ltd is the company behind it (maintainer check). The group site says \"Paxman\", not \"Paxman Coolers\", and shows no number, so the rules send it to review.",
+      "company": {
+        "id": 2299,
+        "name": "PAXMAN COOLERS LIMITED",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "03359002"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "paxmanscalpcooling.com",
+        "finalDomain": "paxmangroup.com",
+        "redirectedFrom": "paxmanscalpcooling.com",
+        "title": "Paxman | Redefining Chemotherapy Side Effect Management",
+        "siteName": "Paxman Group",
+        "ogTitle": "Paxman | Redefining Chemotherapy Side Effect Management",
+        "metaDescription": "Paxman develops clinically-proven cryotherapy solutions to help cancer patients prevent hair loss and peripheral neuropathy during chemotherapy treatment.",
+        "text": "Get Paxman in your country with our global locator."
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-20",
+      "tags": ["true-site", "llm-unsure"],
+      "note": "Our facts give only the round and valuation, so a co-branded credit card site cannot be confirmed from them.",
+      "company": {
+        "id": 2367,
+        "name": "Imprint",
+        "description": "Imprint raised $130m in new financing, valuing the company at approximately $1.9bn."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "imprint.co",
+        "title": "Imprint - Modern co-branded credit cards",
+        "ogTitle": "Imprint - Modern co-branded credit cards",
+        "metaDescription": "Meet the powerful, purpose-built co-branded products that seamlessly adapt to your brand.",
+        "text": "© Imprint Payments 2026"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "unsure",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "candidate"
+      }
+    },
+    {
+      "id": "web-21",
+      "tags": ["namesake-sector"],
+      "note": "archer.com is an aircraft maker with the same one-word name; our Archer is an AI recruiting agent.",
+      "company": {
+        "id": 2380,
+        "name": "Archer",
+        "description": "London- and New York-based AI recruiting agent serving recruiters and job seekers."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "archer.com",
+        "title": "Archer",
+        "siteName": "Archer",
+        "ogTitle": "Archer",
+        "metaDescription": "Building the aircraft and technologies to define the next era of aerospace and defense."
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "different",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-22",
+      "tags": ["namesake-abroad", "namesake-sector"],
+      "note": "playbook.com is a US file-storage product; our Playbook is a Munich company making AI for pharmaceutical documents.",
+      "company": {
+        "id": 2395,
+        "name": "Playbook",
+        "countryCode": "DE",
+        "city": "Munich",
+        "description": "Develops neurological AI that helps pharmaceutical companies turn documents into structured data while enforcing rule-based compliance."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "playbook.com",
+        "title": "Playbook | File infrastructure for every app and team",
+        "siteName": "Playbook",
+        "ogTitle": "Playbook | File infrastructure for every app and team",
+        "metaDescription": "Playbook organizes, searches and delivers every image, video and file, for your team and for the app you're building. One library and one API, set up by your agent in one prompt.",
+        "text": "© 2026 Playbook Digital, Inc. All rights reserved. Terms Privacy"
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "different",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-23",
+      "tags": ["namesake-sector"],
+      "note": "speakeasy.com sells AI governance software; our Speakeasy builds infrastructure for the in-real-life economy.",
+      "company": {
+        "id": 2361,
+        "name": "Speakeasy",
+        "countryCode": "US",
+        "city": "New York",
+        "description": "New York-based startup building infrastructure for the in-real-life economy."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "speakeasy.com",
+        "title": "Govern and secure enterprise AI — Speakeasy",
+        "siteName": "Speakeasy",
+        "ogTitle": "Govern and secure enterprise AI — Speakeasy",
+        "metaDescription": "The AI control plane for discovering, securing, and governing AI agents, MCP servers, and AI applications across your enterprise.",
+        "text": "Company About Speakeasy Customers Trust Center Legal Privacy Policy Copyright © 2026. Speakeasy. All rights reserved."
+      },
+      "pageFrom": "fetched",
+      "llm": {
+        "answer": "different",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-24",
+      "tags": ["not-read", "blocked"],
+      "note": "The drone company in the article (maintainer check), but the site answers 403, so it goes to review.",
+      "company": {
+        "id": 2381,
+        "name": "Quantum Systems",
+        "description": "Quantum Systems completed a €1 billion funding round and is expanding drone support capacity in Ukraine."
+      },
+      "source": "article",
+      "page": {
+        "outcome": "blocked",
+        "detail": "HTTP 403",
+        "domain": "quantum-systems.com"
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-25",
+      "tags": ["not-read", "robots"],
+      "note": "robots.txt could not be read, which counts as disallowing the host for the run.",
+      "company": {
+        "id": 2389,
+        "name": "Acorda",
+        "countryCode": "GB",
+        "city": "London",
+        "description": "Scam prevention startup helping banks identify whether customer payments are being sent to fraudsters."
+      },
+      "source": "guess",
+      "page": {
+        "outcome": "robots",
+        "detail": "robots.txt unavailable",
+        "domain": "acorda.com"
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-26",
+      "tags": ["www-retry", "ukri"],
+      "note": "The bare domain redirects to a broken page (404); www.mindfoundry.ai answers, and its title carries the name. Machine learning for defence and national security.",
+      "company": {
+        "id": 2251,
+        "name": "MIND FOUNDRY LIMITED",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "09882159"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "mindfoundry.ai",
+        "finalDomain": "mindfoundry.ai",
+        "redirectedFrom": null,
+        "title": "Mind Foundry | Machine Learning for Defence & National Security",
+        "ogTitle": "Mind Foundry | Machine Learning for Defence & National Security",
+        "metaDescription": "Machine Learning for Defence & National Security. Machine-speed decision support. Designed for deployment.",
+        "text": ""
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-27",
+      "tags": ["ukri", "parked", "holding-page"],
+      "note": "GoDaddy holding page: an empty page whose script sends the browser to /lander (maintainer check). Parked.",
+      "company": {
+        "id": 2273,
+        "name": "NOWDOCTOR LTD.",
+        "countryCode": "GB"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "nowdoctor.co.uk",
+        "parked": true
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-28",
+      "tags": ["ukri", "parked", "holding-page"],
+      "note": "GoDaddy holding page: an empty page whose script sends the browser to /lander (maintainer check). Parked.",
+      "company": {
+        "id": 2248,
+        "name": "KELTIC PHARMA LIMITED",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "SC688172"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "kelticpharma.com",
+        "parked": true
+      },
+      "pageFrom": "fetched",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-29",
+      "tags": ["namesake-abroad", "namesake-sector"],
+      "note": "A US pet food shop with the same one-word name as a Helsinki healthcare company.",
+      "company": {
+        "id": 2349,
+        "name": "Treat",
+        "countryCode": "FI",
+        "city": "Helsinki",
+        "description": "Helsinki-based HealthTech startup streamlining private healthcare with AI."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "treat.example",
+        "title": "Treat | Healthy dog treats delivered monthly",
+        "siteName": "Treat",
+        "metaDescription": "Single-ingredient dog treats, baked in Ohio and delivered to your door.",
+        "text": "© 2026 Treat Pet Foods LLC. Free shipping on US orders over $40."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "different",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-30",
+      "tags": ["namesake-sector"],
+      "note": "A hair salon in the same city, with the same one-word name.",
+      "company": {
+        "id": 2355,
+        "name": "Iconic",
+        "countryCode": "NL",
+        "city": "Amsterdam",
+        "description": "Amsterdam-based startup building an AI operating system for large capital projects, with five major clients onboard."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "iconic.example",
+        "title": "Iconic | Hair salon in Amsterdam",
+        "siteName": "Iconic",
+        "metaDescription": "Cuts, colour and styling in the heart of Amsterdam. Book your appointment online.",
+        "text": "Iconic Hair Amsterdam. Opening hours Tuesday to Saturday."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "different",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-31",
+      "tags": ["namesake-abroad", "llm-unsure"],
+      "note": "A page that says almost nothing about what it does.",
+      "company": {
+        "id": 2382,
+        "name": "Wilco",
+        "countryCode": "ES",
+        "city": "Madrid",
+        "description": "Madrid-based startup building AI voice and messaging agents for healthcare clinic groups."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "wilco.example",
+        "title": "Wilco",
+        "siteName": "Wilco",
+        "metaDescription": "We help teams work better together.",
+        "text": "Get in touch. © 2026 Wilco."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "unsure",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "candidate"
+      }
+    },
+    {
+      "id": "web-32",
+      "tags": ["namesake-abroad", "llm-unsure"],
+      "note": "Same sector, another country: AI agents for accounting firms in Brazil. A different company, but the LLM was unsure, so it went to review instead.",
+      "company": {
+        "id": 2357,
+        "name": "LATO",
+        "countryCode": "PL",
+        "city": "Warsaw",
+        "description": "AI agents that support private equity due diligence calls."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "lato.example",
+        "title": "LATO | Agentes de IA para escritórios contábeis",
+        "siteName": "LATO",
+        "metaDescription": "Agentes de IA que automatizam o fechamento contábil para escritórios no Brasil.",
+        "text": "LATO Tecnologia Ltda. São Paulo, Brasil."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "unsure",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-33",
+      "tags": ["namesake-sector", "generic-name"],
+      "note": "A dictionary-word domain: an outdoor clothing shop called Mountain. The name normalises to the same word as MountAIn.",
+      "company": {
+        "id": 2354,
+        "name": "MountAIn",
+        "countryCode": "FR",
+        "city": "Grenoble",
+        "description": "Grenoble-based frugal AI infrastructure company enabling advanced AI on microcontrollers costing less than €9.11."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "mountain.example",
+        "title": "Mountain | Outdoor clothing and gear",
+        "siteName": "Mountain",
+        "metaDescription": "Jackets, boots and camping gear for every season.",
+        "text": "Free returns within 30 days. © 2026 Mountain Outdoor Ltd."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "different",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-34",
+      "tags": ["short-name"],
+      "note": "A three-letter alias matches the title, but a name that short never links on a name match alone, and a guess is not a stated source.",
+      "company": {
+        "id": 2258,
+        "name": "BCD STUDIO LTD.",
+        "aliases": ["BCD"],
+        "countryCode": "GB",
+        "linkedCompanyNumber": "09510922"
+      },
+      "source": "guess",
+      "page": {
+        "domain": "bcd.example",
+        "title": "BCD | Building control and drainage surveys",
+        "siteName": "BCD",
+        "text": "BCD Surveys, Norwich."
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-35",
+      "tags": ["placeholder-name", "generic-name"],
+      "note": "A generic alias (\"Robotics\") matches the title. A placeholder name never links on a name match.",
+      "company": {
+        "id": 2343,
+        "name": "Genesis AI",
+        "aliases": ["Robotics"],
+        "description": "Develops robots that perform physical tasks by learning from human movements for use in factories and warehouses."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "robotics.example",
+        "title": "Robotics | Industrial robot spare parts",
+        "siteName": "Robotics",
+        "text": "Spare parts for industrial arms, shipped next day."
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-36",
+      "tags": ["short-name", "article"],
+      "note": "The article printed this domain and the page shows the short alias. A stated source with a name match links even a short name (W2).",
+      "company": {
+        "id": 2258,
+        "name": "BCD STUDIO LTD.",
+        "aliases": ["BCD"],
+        "countryCode": "GB",
+        "linkedCompanyNumber": "09510922"
+      },
+      "source": "article",
+      "page": {
+        "domain": "bcd-studio.example",
+        "title": "BCD",
+        "siteName": "BCD",
+        "metaDescription": "Brand and digital design studio.",
+        "text": "BCD Studio Ltd. Registered in England and Wales."
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-37",
+      "tags": ["news-host"],
+      "note": "The extraction took the publisher's domain as the company's.",
+      "company": {
+        "id": 2359,
+        "name": "Wilgot",
+        "countryCode": "SE",
+        "city": "Stockholm",
+        "description": "Stockholm-based company developing agentic commerce solutions for brands."
+      },
+      "source": "article",
+      "page": {
+        "domain": "sifted.eu",
+        "title": "Sifted",
+        "siteName": "Sifted"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-38",
+      "tags": ["investor-domain"],
+      "note": "The extraction took the lead investor's domain. The investor in our data holds it.",
+      "company": {
+        "id": 2397,
+        "name": "HoloSolis",
+        "countryCode": "FR",
+        "city": "Paris",
+        "description": "Paris-based solar manufacturing company building a solar gigafactory in France."
+      },
+      "source": "article",
+      "holder": {
+        "kind": "investor",
+        "name": "Harbour Lane Ventures"
+      },
+      "page": {
+        "domain": "harbourlane.example",
+        "title": "Harbour Lane Ventures | Backing climate founders",
+        "siteName": "Harbour Lane Ventures"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-39",
+      "tags": ["accelerator-host"],
+      "note": "An accelerator's domain from the article.",
+      "company": {
+        "id": 2388,
+        "name": "CoProd",
+        "countryCode": "CH",
+        "description": "Robot integration company founded by EPFL alumni who built a robot in a garage."
+      },
+      "source": "article",
+      "page": {
+        "domain": "ycombinator.com",
+        "title": "Y Combinator"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-40",
+      "tags": ["link-in-bio"],
+      "note": "A link-in-bio page from the article.",
+      "company": {
+        "id": 2390,
+        "name": "Legacy Locker",
+        "description": "A service that helps families organise important documents, share memories and raise money for charity."
+      },
+      "source": "article",
+      "page": {
+        "domain": "linktr.ee",
+        "title": "Legacy Locker | Linktree"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-41",
+      "tags": ["app-store"],
+      "note": "An App Store link from the article becomes apple.com as a registrable domain.",
+      "company": {
+        "id": 2373,
+        "name": "Gotmoves",
+        "countryCode": "GB",
+        "city": "Warwick",
+        "description": "Warwick-based AI car delivery platform managing over 1,000 deliveries a month."
+      },
+      "source": "article",
+      "page": {
+        "domain": "apple.com",
+        "title": "Apple"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-42",
+      "tags": ["data-host"],
+      "note": "A company database profile from the article.",
+      "company": {
+        "id": 2363,
+        "name": "Tesorai",
+        "description": "Tesorai raised a seed round to make raw scientific lab data searchable."
+      },
+      "source": "article",
+      "page": {
+        "domain": "crunchbase.com",
+        "title": "Tesorai - Crunchbase Company Profile & Funding"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-43",
+      "tags": ["social-host"],
+      "note": "A social profile from the article.",
+      "company": {
+        "id": 2368,
+        "name": "End Close",
+        "countryCode": "IE",
+        "description": "Irish-founded company raising funds to grow its engineering, go-to-market and implementation teams."
+      },
+      "source": "article",
+      "page": {
+        "domain": "linkedin.com",
+        "title": "End Close | LinkedIn"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-44",
+      "tags": ["publishing-host"],
+      "note": "A page on a shared publishing host from the article.",
+      "company": {
+        "id": 2372,
+        "name": "Asynchronics",
+        "countryCode": "PL",
+        "description": "Open-source software and a digital-twin marketplace for simulating spacecraft before launch."
+      },
+      "source": "article",
+      "page": {
+        "domain": "asynchronics.notion.site",
+        "title": "Asynchronics"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-45",
+      "tags": ["parked"],
+      "note": "A for-sale page on the guessed domain.",
+      "company": {
+        "id": 2386,
+        "name": "Vetaion",
+        "countryCode": "DE",
+        "city": "Munich",
+        "description": "Munich-based company automating the manufacturing of custom electrical control cabinets with AI and robotics."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "vetaion.example",
+        "title": "vetaion.example is for sale",
+        "text": "This domain is for sale. Make an offer on this domain.",
+        "parked": true
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-46",
+      "tags": ["parked", "redirect"],
+      "note": "The guessed domain redirects to a domain marketplace.",
+      "company": {
+        "id": 2375,
+        "name": "Occam Industries",
+        "description": "Defense tech company whose technology is deployed in combat supporting Ukrainian military brigades."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "occamindustries.example",
+        "finalDomain": "sedo.com",
+        "redirectedFrom": "occamindustries.example",
+        "title": "occamindustries.example",
+        "parked": true
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-47",
+      "tags": ["not-read"],
+      "note": "The domain serves a PDF at its root.",
+      "company": {
+        "id": 2360,
+        "name": "IntelliProve",
+        "description": "Develops technology that turns cameras in smartphones and laptops into health sensors."
+      },
+      "source": "guess",
+      "page": {
+        "outcome": "not_html",
+        "detail": "application/pdf",
+        "domain": "intelliprove.example"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-48",
+      "tags": ["held-by-other", "redirect", "rebrand"],
+      "note": "The acquired company's domain now redirects to its acquirer, which already holds the domain. A person decides.",
+      "company": {
+        "id": 2377,
+        "name": "Phemly",
+        "description": "Competitor acquired by Ranketta as it expands across Europe."
+      },
+      "source": "article",
+      "holder": {
+        "kind": "company",
+        "name": "Ranketta"
+      },
+      "page": {
+        "domain": "phemly.example",
+        "finalDomain": "ranketta.com",
+        "redirectedFrom": "phemly.example",
+        "title": "Ranketta - Become the product AI recommends",
+        "siteName": "Ranketta"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "candidate"
+      }
+    },
+    {
+      "id": "web-49",
+      "tags": ["held-by-other"],
+      "note": "Another company record, likely the same company under a shorter name, already holds the domain. A person merges or decides.",
+      "company": {
+        "id": 2396,
+        "name": "Theseus Robotics",
+        "countryCode": "CH",
+        "description": "Swiss startup developing AI-powered robots for shelf restocking and online grocery order picking."
+      },
+      "source": "article",
+      "holder": {
+        "kind": "company",
+        "name": "Theseus"
+      },
+      "page": {
+        "domain": "theseusrobotics.example",
+        "title": "Theseus Robotics | Restocking robots for grocery",
+        "siteName": "Theseus Robotics"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "candidate"
+      }
+    },
+    {
+      "id": "web-50",
+      "tags": ["redirect", "namesake-sector"],
+      "note": "The guessed domain redirects to an industrial valve maker called Agon.",
+      "company": {
+        "id": 2387,
+        "name": "Agon",
+        "countryCode": "GB",
+        "city": "London",
+        "description": "Agon raised a £53m Series A, bringing total funding to $100m and valuing the company at $450m."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "agon.example",
+        "finalDomain": "agonvalves.example",
+        "redirectedFrom": "agon.example",
+        "title": "Agon | Industrial valves and actuators",
+        "siteName": "Agon",
+        "metaDescription": "Valves and actuators for water, oil and gas since 1978."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "different",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-51",
+      "tags": ["redirect", "rebrand", "article"],
+      "note": "The article's domain redirects to the company's new domain. A redirect away from a stated domain needs the LLM check (W3).",
+      "company": {
+        "id": 2392,
+        "name": "Hoplite",
+        "countryCode": "IE",
+        "description": "Develops technology to speed up agentic use."
+      },
+      "source": "article",
+      "page": {
+        "domain": "hoplite.example",
+        "finalDomain": "hoplitehq.example",
+        "redirectedFrom": "hoplite.example",
+        "title": "Hoplite | Faster agents",
+        "siteName": "Hoplite",
+        "metaDescription": "Hoplite makes agentic workloads run faster, with less waiting between steps.",
+        "text": "© 2026 Hoplite Technologies Ltd, Dublin."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-52",
+      "tags": ["other-legal-entity", "company-number"],
+      "note": "A trading name of another company, whose number differs from the company's Companies House number (X2).",
+      "company": {
+        "id": 2379,
+        "name": "Clarity Sensors",
+        "countryCode": "GB",
+        "city": "Cambridge",
+        "description": "Cambridge-based semiconductor startup developing photon-counting CT detectors to make advanced medical imaging more affordable and accessible to hospitals.",
+        "linkedCompanyNumber": "14120836"
+      },
+      "source": "guess",
+      "page": {
+        "domain": "claritysensors.example",
+        "title": "Clarity Sensors | Air quality monitoring for offices",
+        "siteName": "Clarity Sensors",
+        "text": "Clarity Sensors is a trading name of Brightline Instruments Ltd. Registered in England and Wales, company number 07654321.",
+        "companyNumbers": ["07654321"]
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-53",
+      "tags": ["reseller-footer", "company-number", "ukri"],
+      "note": "The shop is run by a reseller whose number is in the footer. X2 comes before W2, so the name match does not link it.",
+      "company": {
+        "id": 2340,
+        "name": "RETHREAD DENIM LTD",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "15531303"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "rethreaddenim.example",
+        "title": "Rethread Denim | Shop repaired jeans",
+        "siteName": "Rethread Denim",
+        "text": "Online shop operated by Northgate Retail Ltd. Registered in England, company number 09123456.",
+        "companyNumbers": ["09123456"]
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-54",
+      "tags": ["other-legal-entity", "namesake-sector"],
+      "note": "A Stockholm building firm with the same name; the footer names another legal entity.",
+      "company": {
+        "id": 2359,
+        "name": "Wilgot",
+        "countryCode": "SE",
+        "city": "Stockholm",
+        "description": "Stockholm-based company developing agentic commerce solutions for brands."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "wilgot.example",
+        "title": "Wilgot | Bygg och renovering i Stockholm",
+        "siteName": "Wilgot",
+        "metaDescription": "Badrum, kök och tillbyggnader i Stockholmsområdet.",
+        "text": "© 2026 Wilgot Bygg AB, org.nr 556000-0000."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "different",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-55",
+      "tags": ["over-budget"],
+      "note": "The company's own site, but the budget guard refused the LLM check, so it goes to review (C1).",
+      "company": {
+        "id": 2346,
+        "name": "Fermat",
+        "countryCode": "ES",
+        "city": "Barcelona",
+        "description": "Barcelona-based AI platform for fashion and luxury brands expanding from a design tool to full garment production."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "fermat.example",
+        "title": "Fermat | AI design and production for fashion brands",
+        "siteName": "Fermat",
+        "metaDescription": "From sketch to finished garment: Fermat helps fashion and luxury brands design and produce collections with AI.",
+        "text": "Fermat, Barcelona."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "over_budget",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-56",
+      "tags": ["llm-invalid"],
+      "note": "The company's own site, but the model's answer failed the schema, so it goes to review (C1).",
+      "company": {
+        "id": 2348,
+        "name": "Previsia",
+        "countryCode": "FR",
+        "city": "Toulouse",
+        "description": "French insurtech building an AI risk-prevention platform for businesses, brokers, and insurers."
+      },
+      "source": "guess",
+      "page": {
+        "domain": "previsia.example",
+        "title": "Previsia | Prévention des risques pour les entreprises",
+        "siteName": "Previsia",
+        "metaDescription": "La plateforme de prévention des risques par l'IA pour les entreprises, les courtiers et les assureurs.",
+        "text": "Previsia SAS, Toulouse."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "invalid",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-57",
+      "tags": ["manual-rejection"],
+      "note": "A maintainer rejected this domain earlier. The rules would link it now (W3), but a manual decision is final.",
+      "company": {
+        "id": 2356,
+        "name": "Perry AI",
+        "countryCode": "GB",
+        "city": "London",
+        "description": "London-based startup building an AI-powered legal operating system for private equity and venture capital funds."
+      },
+      "source": "guess",
+      "existing": [
+        {
+          "domain": "perry.example",
+          "status": "rejected",
+          "decidedBy": "manual",
+          "rule": "manual"
+        }
+      ],
+      "page": {
+        "domain": "perry.example",
+        "title": "Perry | The legal operating system for private funds",
+        "siteName": "Perry AI",
+        "metaDescription": "Perry AI runs fund legal work for private equity and venture capital managers."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-58",
+      "tags": ["already-linked"],
+      "note": "The company already has a linked domain, so a second strong result becomes a candidate.",
+      "company": {
+        "id": 2369,
+        "name": "Pretxt",
+        "countryCode": "IE",
+        "city": "Dublin",
+        "description": "Pretxt offers technology to supervise AI agents handling consequential workplace tasks."
+      },
+      "source": "guess",
+      "existing": [
+        {
+          "domain": "pretxt.example",
+          "status": "linked",
+          "decidedBy": "auto",
+          "rule": "W3"
+        }
+      ],
+      "page": {
+        "domain": "pretxt-ai.example",
+        "title": "Pretxt | Supervision for AI agents",
+        "siteName": "Pretxt",
+        "metaDescription": "Pretxt supervises AI agents that handle consequential work."
+      },
+      "pageFrom": "hand-written",
+      "llm": {
+        "answer": "same",
+        "recorded": "hand-written stand-in"
+      },
+      "expected": {
+        "status": "candidate"
+      }
+    },
+    {
+      "id": "web-59",
+      "tags": ["recheck", "parked"],
+      "note": "A re-check finds the linked domain parked: the link is demoted and the company's website cleared.",
+      "company": {
+        "id": 2351,
+        "name": "Alecto",
+        "countryCode": "GB",
+        "description": "British AI-native law firm expanding from property transactions into additional areas of consumer law and new geographies."
+      },
+      "source": "article",
+      "existing": [
+        {
+          "domain": "alecto.example",
+          "status": "linked",
+          "decidedBy": "auto",
+          "rule": "W2"
+        }
+      ],
+      "page": {
+        "domain": "alecto.example",
+        "title": "alecto.example",
+        "text": "This domain may be for sale.",
+        "parked": true
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "web-60",
+      "tags": ["recheck", "not-read"],
+      "note": "A re-check is blocked: no judgement, so the earlier automatic link stands.",
+      "company": {
+        "id": 2312,
+        "name": "CABLE COATINGS LIMITED",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "10096075"
+      },
+      "source": "ukri",
+      "existing": [
+        {
+          "domain": "cablecoatings.example",
+          "status": "linked",
+          "decidedBy": "auto",
+          "rule": "W1"
+        }
+      ],
+      "page": {
+        "outcome": "blocked",
+        "detail": "HTTP 429",
+        "domain": "cablecoatings.example"
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "linked"
+      }
+    },
+    {
+      "id": "web-61",
+      "tags": ["ukri", "hyphenated-name"],
+      "note": "A hyphenated name stays whole when the title is split.",
+      "company": {
+        "id": 2317,
+        "name": "OPTIMISE-AI LTD",
+        "countryCode": "GB",
+        "linkedCompanyNumber": "14926244"
+      },
+      "source": "ukri",
+      "page": {
+        "domain": "optimise-ai.example",
+        "title": "Optimise-AI | Process optimisation for manufacturers",
+        "text": "Optimise-AI Ltd, registered in England and Wales."
+      },
+      "pageFrom": "hand-written",
+      "expected": {
+        "status": "linked"
+      }
+    }
+  ]
+}

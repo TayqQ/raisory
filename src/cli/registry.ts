@@ -3,15 +3,19 @@ import { REGISTRY_KINDS, type RegistryKind } from "@/core/enums";
 import { createPipelineDb } from "@/db/client";
 import {
   approveLinks,
+  approveWebsites,
   link,
   listCandidates,
+  listWebsiteCandidates,
   reject,
   rejectCandidates,
+  rejectWebsites,
   showCompany,
   unlinkCompany,
   type ReviewCandidate,
   type ReviewEvent,
   type ReviewResult,
+  type WebsiteReviewCandidate,
 } from "@/pipeline/registry/review";
 import { loadDotEnv } from "./env";
 
@@ -26,6 +30,10 @@ const USAGE = `Usage: pnpm registry <command>
   link <company-slug> <number> --registry ch|sec [--name "..."]
                                           Link a number you looked up yourself
   unlink <company-slug> --registry ch|sec Remove the link. The number is then rejected
+
+  list --websites [--limit 20]            Open website candidates: rule, evidence and the URL to check
+  approve --website <id> [<id> ...]       Link website candidates by id (from list --websites). Manual, so final
+  reject --website <id> [<id> ...]        Reject websites by id, linked ones included. Never proposed again
 
 Run it from a maintainer's machine with DATABASE_URL set. It never calls an API.
 Check each candidate at the URL that list prints before you approve it.`;
@@ -89,6 +97,25 @@ export function formatCandidate(row: ReviewCandidate): string {
   return lines.join("\n");
 }
 
+export function formatWebsiteCandidate(row: WebsiteReviewCandidate): string {
+  const place = [row.company.town, row.company.country]
+    .filter(Boolean)
+    .join(", ");
+  const numbers = [
+    row.company.companyNumber ? `CH ${row.company.companyNumber}` : null,
+    row.companyNumberSeen ? `page shows ${row.companyNumberSeen}` : null,
+  ].filter(Boolean);
+  const lines = [
+    `#${row.id}  ${row.company.name} (${row.company.slug})${place ? `  ${place}` : ""}`,
+    `    ${row.domain}  [${row.rule}, from ${row.source}]  checked ${row.checkedAt.toISOString().slice(0, 10)}`,
+    `    about:   ${row.company.description ?? "no description"}`,
+    `    headlines: ${row.company.headlines}${numbers.length ? `  ${numbers.join("; ")}` : ""}`,
+    `    why:     ${row.evidence}`,
+    `    check:   ${row.url}`,
+  ];
+  return lines.join("\n");
+}
+
 function printResults(results: ReviewResult[]): number {
   for (const result of results) {
     console.log(
@@ -104,6 +131,8 @@ async function main(): Promise<number> {
     options: {
       registry: { type: "string" },
       limit: { type: "string", default: "20" },
+      websites: { type: "boolean", default: false },
+      website: { type: "boolean", default: false },
       name: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -131,6 +160,14 @@ async function main(): Promise<number> {
         if (!Number.isInteger(limit) || limit < 1) {
           throw new Error("--limit needs a positive number");
         }
+        if (values.websites) {
+          const websites = await listWebsiteCandidates(db, { limit });
+          console.log(websites.map(formatWebsiteCandidate).join("\n\n"));
+          console.error(
+            `${websites.length} open website candidates${websites.length === limit ? " (limit reached; use --limit for more)" : ""}`,
+          );
+          return 0;
+        }
         const rows = await listCandidates(db, {
           registry: registryKind(values.registry),
           limit,
@@ -155,8 +192,14 @@ async function main(): Promise<number> {
         return 0;
       }
       case "approve":
+        if (values.website) {
+          return printResults(await approveWebsites(db, parseIds(rest)));
+        }
         return printResults(await approveLinks(db, parseIds(rest), now));
       case "reject": {
+        if (values.website) {
+          return printResults(await rejectWebsites(db, parseIds(rest)));
+        }
         if (rest.length === 2 && !/^\d+$/.test(rest[0] ?? "")) {
           return printResults([
             await reject(db, {

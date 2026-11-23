@@ -97,6 +97,8 @@ export const LLM_PURPOSES = [
   "tagging",
   // Phase 3 (reserved for reading SH01 documents, which is not built)
   "document_reading",
+  // Company websites: the LLM check in the verification rules (D64).
+  "website_check",
 ] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 

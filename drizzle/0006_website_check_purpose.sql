@@ -1,0 +1,1 @@
+ALTER TYPE "public"."llm_purpose" ADD VALUE 'website_check';

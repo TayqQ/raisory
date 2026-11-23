@@ -298,6 +298,13 @@ const PARKING_HOST_PATTERN = new RegExp(
   "i",
 );
 
+/**
+ * GoDaddy's holding page: an empty page whose only content is a script that
+ * sends the browser to `/lander`, which refuses automated requests.
+ */
+const LANDER_REDIRECT = /location(?:\.href)?\s*=\s*["']\/lander["']/i;
+const LANDER_MAX_TEXT_CHARS = 40;
+
 /** Parked or for-sale signals in the final domain, the page's own links or its text. */
 export function isParked(
   finalDomain: string,
@@ -305,6 +312,12 @@ export function isParked(
   text: string,
 ): boolean {
   if (PARKING_HOSTS.includes(finalDomain)) return true;
+  if (
+    LANDER_REDIRECT.test(html) &&
+    text.trim().length <= LANDER_MAX_TEXT_CHARS
+  ) {
+    return true;
+  }
   const sources = [
     ...openingTags(html, "script"),
     ...openingTags(html, "iframe"),
@@ -914,7 +927,14 @@ export function createWebsiteFetcher(
     if (!asked) return emptySummary(domain, "failed", "not a web domain");
     if (!take()) return emptySummary(asked, "cap", "page limit reached");
 
-    const got = await get(`https://${asked}/`, true);
+    let got = await get(`https://${asked}/`, true);
+    // Some sites answer only at www: the bare domain errors, or redirects to
+    // a broken page (mindfoundry.ai sent it to a 404). One retry at www, as
+    // part of the same page. If it fails too, the first failure is reported.
+    if (got.kind === "failed") {
+      const retry = await get(`https://www.${asked}/`, true);
+      if (retry.kind !== "failed") got = retry;
+    }
     const reached = registrableDomain(new URL(got.url).hostname) ?? asked;
     switch (got.kind) {
       case "robots":

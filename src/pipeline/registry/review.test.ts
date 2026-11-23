@@ -1,16 +1,26 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
-import { companies, events, fundingRounds, registryLinks } from "@/db/schema";
+import {
+  companies,
+  companyWebsites,
+  events,
+  fundingRounds,
+  registryLinks,
+} from "@/db/schema";
 import { createTestDb, type TestDb } from "@/db/testing";
 import { insertCompany } from "@/pipeline/resolve/testing";
+import { recordWebsiteResult } from "@/pipeline/websites/website-store";
 import { recordCandidate, recordLink } from "./link-store";
 import {
   approveLinks,
+  approveWebsites,
   link,
   listCandidates,
+  listWebsiteCandidates,
   reject,
   rejectCandidates,
+  rejectWebsites,
   showCompany,
   unlinkCompany,
 } from "./review";
@@ -245,5 +255,112 @@ describe("approve, reject, link, unlink", () => {
     expect((await showCompany(db, acme.slug)).links[0]?.status).toBe(
       "rejected",
     );
+  });
+});
+
+describe("websites", () => {
+  async function website(
+    companyId: number,
+    domain: string,
+    status: "linked" | "candidate" | "rejected" = "candidate",
+  ) {
+    await recordWebsiteResult(db, {
+      companyId,
+      decision: {
+        domain,
+        status,
+        rule: status === "candidate" ? "C1" : "W3",
+        evidence: "guessed domain; title matches; LLM check unsure",
+        companyNumberSeen: "09876543",
+        judged: true,
+      },
+      source: "guess",
+      iconCandidates: [],
+      fingerprint: "f1",
+      now: NOW,
+    });
+    const [row] = await db
+      .select()
+      .from(companyWebsites)
+      .where(
+        and(
+          eq(companyWebsites.companyId, companyId),
+          eq(companyWebsites.domain, domain),
+        ),
+      );
+    return row!;
+  }
+
+  it("lists open website candidates, newest companies first, without merged companies", async () => {
+    const old = await insertCompany(db, {
+      name: "Old Co",
+      firstSeenAt: new Date("2026-01-01T00:00:00Z"),
+    });
+    const fresh = await insertCompany(db, {
+      name: "Fresh Co",
+      description: "Robots for warehouses.",
+      firstSeenAt: new Date("2026-06-01T00:00:00Z"),
+    });
+    const merged = await insertCompany(db, {
+      name: "Merged Co",
+      mergedIntoId: fresh.id,
+    });
+    await website(old.id, "old.example");
+    await website(fresh.id, "fresh.example");
+    await website(fresh.id, "linked.example", "linked");
+    await db.insert(companyWebsites).values({
+      companyId: merged.id,
+      domain: "merged.example",
+      status: "candidate",
+      rule: "C2",
+      source: "article",
+      evidence: "test",
+      checkedAt: NOW,
+      decidedBy: "auto",
+      fingerprint: "f1",
+    });
+
+    const rows = await listWebsiteCandidates(db, { limit: 10 });
+    expect(rows.map((r) => r.domain)).toEqual(["fresh.example", "old.example"]);
+    expect(rows[0]).toMatchObject({
+      url: "https://fresh.example/",
+      rule: "C1",
+      source: "guess",
+      companyNumberSeen: "09876543",
+      company: { name: "Fresh Co", description: "Robots for warehouses." },
+    });
+  });
+
+  it("approves and rejects by id, and a manual rejection is never re-linked", async () => {
+    const acme = await insertCompany(db, { name: "Acme" });
+    const first = await website(acme.id, "acme.example");
+    const second = await website(acme.id, "acme-hq.example");
+
+    expect(await approveWebsites(db, [first.id])).toEqual([
+      { id: first.id, ok: true, message: "linked acme.example" },
+    ]);
+    expect((await company(acme.slug)).websiteDomain).toBe("acme.example");
+
+    const results = await rejectWebsites(db, [second.id, first.id, 999]);
+    expect(results.map((r) => r.ok)).toEqual([true, true, false]);
+    expect((await company(acme.slug)).websiteDomain).toBeNull();
+
+    const again = await recordWebsiteResult(db, {
+      companyId: acme.id,
+      decision: {
+        domain: "acme.example",
+        status: "linked",
+        rule: "W1",
+        evidence: "page shows company number 09876543",
+        companyNumberSeen: "09876543",
+        judged: true,
+      },
+      source: "article",
+      iconCandidates: [],
+      fingerprint: "f2",
+      now: NOW,
+    });
+    expect(again.outcome).toBe("blocked");
+    expect((await company(acme.slug)).websiteDomain).toBeNull();
   });
 });

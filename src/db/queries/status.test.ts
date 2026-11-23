@@ -224,6 +224,7 @@ describe("getStatusSummary Phase 2 block", () => {
       tagging: 300_000,
       eval: 0,
       document_reading: 0,
+      website_check: 0,
     });
     const sum = Object.values(byPurpose).reduce((a, b) => a + b, 0);
     expect(sum).toBe(summary.monthToDateUsdMicros);

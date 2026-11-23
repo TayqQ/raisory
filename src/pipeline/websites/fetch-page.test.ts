@@ -640,7 +640,8 @@ describe("createWebsiteFetcher", () => {
       outcome: "failed",
       detail: "more than 5 redirects",
     });
-    expect(calls.length - before).toBe(6);
+    // Six hops, then one retry at www (which finds nothing).
+    expect(calls.length - before).toBe(7);
   });
 
   it("follows one redirect to another domain and notes it", async () => {
@@ -740,6 +741,31 @@ describe("createWebsiteFetcher", () => {
     expect(calls.map((call) => call.url)).toEqual(["https://acme.example/"]);
   });
 
+  it("retries at www when the bare domain fails, and keeps the first failure if www fails too", async () => {
+    const { fetcher, calls } = fakeSite({
+      routes: {
+        "https://split.example/": redirectTo("https://www.split.example/s"),
+        "https://www.split.example/": htmlPage(HOME),
+      },
+    });
+    expect(await fetcher.fetchPage("split.example")).toMatchObject({
+      outcome: "fetched",
+      finalDomain: "split.example",
+      redirectedFrom: null,
+    });
+    expect(calls.map((call) => call.url)).toContain(
+      "https://www.split.example/",
+    );
+
+    const gone = fakeSite({
+      routes: { "https://gone.example/": htmlPage("gone", 410) },
+    });
+    expect(await gone.fetcher.fetchPage("gone.example")).toMatchObject({
+      outcome: "failed",
+      detail: "HTTP 410",
+    });
+  });
+
   it("flags parked and for-sale pages", async () => {
     const { fetcher } = fakeSite({
       routes: {
@@ -755,8 +781,13 @@ describe("createWebsiteFetcher", () => {
         "https://sedo.com/search/details/?domain=moved.example": htmlPage(
           "<html><body>Buy now</body></html>",
         ),
+        // GoDaddy's holding page, as nowdoctor.co.uk served it.
+        "https://lander.example/": htmlPage(
+          '<!DOCTYPE html><html><head><script>window.onload=function(){window.location.href="/lander"}</script></head></html>',
+        ),
       },
     });
+    expect((await fetcher.fetchPage("lander.example")).parked).toBe(true);
     expect((await fetcher.fetchPage("forsale.example")).parked).toBe(true);
     expect((await fetcher.fetchPage("parked.example")).parked).toBe(true);
     expect(await fetcher.fetchPage("moved.example")).toMatchObject({

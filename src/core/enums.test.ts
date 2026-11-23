@@ -182,6 +182,11 @@ const WEBSITES_APPENDED: EnumCase[] = [
   ["REGISTRY_LINK_METHODS", REGISTRY_LINK_METHODS, ["website_number"]],
 ];
 
+// The website LLM check (migration 0006) appends this value to a Phase 3 enum.
+const WEBSITE_CHECK_APPENDED: EnumCase[] = [
+  ["LLM_PURPOSES", LLM_PURPOSES, ["website_check"]],
+];
+
 const WEBSITES_NEW: EnumCase[] = [
   [
     "WEBSITE_RULES",
@@ -203,8 +208,9 @@ describe("enums", () => {
     "%s appends the Phase 3 values after the earlier ones",
     (name, actual, appended) => {
       const before = BEFORE_PHASE_3.find(([n]) => n === name)?.[2];
+      const later = WEBSITE_CHECK_APPENDED.find(([n]) => n === name)?.[2] ?? [];
       expect(before, name).toBeDefined();
-      expect(actual.slice(before?.length)).toEqual(appended);
+      expect(actual.slice(before?.length)).toEqual([...appended, ...later]);
     },
   );
 

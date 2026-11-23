@@ -177,6 +177,8 @@ function formatPurpose(purpose: LlmPurpose): string {
       return "Eval";
     case "document_reading":
       return "Document reading";
+    case "website_check":
+      return "Website check";
     default: {
       const exhaustive: never = purpose;
       return exhaustive;

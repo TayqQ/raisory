@@ -3,7 +3,12 @@
 // never reads a full postcode or any personal data.
 
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import type { RegistryKind, RegistryLinkStatus } from "@/core/enums";
+import type {
+  RegistryKind,
+  RegistryLinkStatus,
+  WebsiteRule,
+  WebsiteSource,
+} from "@/core/enums";
 import {
   companiesHouseUrl,
   edgarCompanyUrl,
@@ -14,6 +19,7 @@ import {
   chCompanies,
   companies,
   companyLocations,
+  companyWebsites,
   eventSources,
   events,
   formDFilings,
@@ -27,6 +33,10 @@ import {
   rejectLink,
   unlink,
 } from "./link-store";
+import {
+  approveWebsite,
+  rejectWebsite,
+} from "@/pipeline/websites/website-store";
 
 export interface ReviewEvent {
   type: string;
@@ -567,4 +577,98 @@ export async function unlinkCompany(
   return number === null
     ? { id: company.slug, ok: false, message: "no link to remove" }
     : { id: company.slug, ok: true, message: `unlinked ${number}` };
+}
+
+// ---------------------------------------------------------------------------
+// Company websites (D64): candidate domains from the verification rules.
+
+export interface WebsiteReviewCandidate {
+  /** The `company_websites` id, used by `approve --website` and `reject --website`. */
+  id: number;
+  domain: string;
+  url: string;
+  source: WebsiteSource;
+  rule: WebsiteRule;
+  evidence: string;
+  companyNumberSeen: string | null;
+  checkedAt: Date;
+  company: {
+    id: number;
+    slug: string;
+    name: string;
+    country: string | null;
+    town: string | null;
+    description: string | null;
+    /** The company's Companies House number, if it has one. */
+    companyNumber: string | null;
+    headlines: number;
+  };
+}
+
+/** Open website candidates, newest companies first. Companies merged away are left out. */
+export async function listWebsiteCandidates(
+  db: Db,
+  options: { limit: number },
+): Promise<WebsiteReviewCandidate[]> {
+  const rows = await db
+    .select({ website: companyWebsites, company: companies })
+    .from(companyWebsites)
+    .innerJoin(companies, eq(companies.id, companyWebsites.companyId))
+    .where(
+      and(
+        eq(companyWebsites.status, "candidate"),
+        isNull(companies.mergedIntoId),
+      ),
+    )
+    .orderBy(
+      desc(companies.firstSeenAt),
+      desc(companies.id),
+      asc(companyWebsites.id),
+    )
+    .limit(options.limit);
+
+  const result: WebsiteReviewCandidate[] = [];
+  for (const { website, company } of rows) {
+    result.push({
+      id: website.id,
+      domain: website.domain,
+      url: `https://${website.domain}/`,
+      source: website.source,
+      rule: website.rule,
+      evidence: website.evidence,
+      companyNumberSeen: website.companyNumberSeen,
+      checkedAt: website.checkedAt,
+      company: {
+        id: company.id,
+        slug: company.slug,
+        name: company.name,
+        country: company.countryCode,
+        town: company.city,
+        description: company.description,
+        companyNumber: company.ukCompanyNumber,
+        headlines: await headlineCount(db, company.id),
+      },
+    });
+  }
+  return result;
+}
+
+/** Links website candidates by `company_websites` id, as manual decisions. Each id is independent. */
+export async function approveWebsites(
+  db: Db,
+  ids: number[],
+): Promise<ReviewResult[]> {
+  const results: ReviewResult[] = [];
+  for (const id of ids) results.push({ id, ...(await approveWebsite(db, id)) });
+  return results;
+}
+
+/** Rejects websites by `company_websites` id. Automatic checks never link or propose them again. */
+export async function rejectWebsites(
+  db: Db,
+  ids: number[],
+): Promise<ReviewResult[]> {
+  const results: ReviewResult[] = [];
+  for (const id of ids) results.push({ id, ...(await rejectWebsite(db, id)) });
+  return results;
 }

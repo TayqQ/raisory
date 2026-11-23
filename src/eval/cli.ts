@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { loadDotEnv } from "@/cli/env";
@@ -17,6 +17,13 @@ import {
 import { renderReport, renderTable, scoreRecording } from "./report";
 import { renderLinkReport, runLinkEval } from "./links";
 import { renderResolutionReport, runResolutionEval } from "./resolution";
+import {
+  renderWebsiteReport,
+  runWebsiteEval,
+  WEBSITE_CASES_PATH,
+  withLiveAnswers,
+} from "./websites";
+import { WEBSITE_CHECK_MODEL } from "@/pipeline/websites/llm-check";
 import {
   TAG_EMBEDDING_TEMPLATE,
   TAG_MEANING_TEMPLATE,
@@ -61,6 +68,8 @@ const LINK_REPORT_PATH = "docs/link-eval-results.md";
 const LIVE_CAP_USD_MICROS = 1_000_000;
 /** Cap for one `--themes --check --live` run: the verdicts cost cents. */
 const THEME_CHECK_LIVE_CAP_USD_MICROS = 100_000;
+/** Cap for one `--websites --live` run. */
+const WEBSITE_LIVE_CAP_USD_MICROS = 50_000;
 
 const USAGE = `Usage: pnpm eval <mode>
 
@@ -68,6 +77,8 @@ const USAGE = `Usage: pnpm eval <mode>
   --live --model <id> [...]      Call the model on every case and record it. Costs money
   --resolution                   Score company and event merging. No network, no cost
   --links                        Score the registry link rules on labelled cases. No network, no cost
+  --websites                     Score the website rules on labelled cases with recorded LLM answers. No network, no cost
+  --websites --live              Ask the LLM check on the cases that need it and record the answers. Capped at $0.05
   --themes                       Sweep the theme threshold on the recorded embeddings. No network, no cost
   --themes --live                Embed the labelled tags once and record them. Costs well under $0.001
   --themes [--live] --model <id> The same with another embedding model. Prints the sweep; the report stays the default model's
@@ -392,6 +403,52 @@ async function recordThemes(
   return await themeReport(model);
 }
 
+/** The website eval, offline or (maintainer only) live. True when no link is wrong. */
+async function websiteEval(live: boolean): Promise<boolean> {
+  if (!live) {
+    const result = await runWebsiteEval();
+    console.log(renderWebsiteReport(result));
+    return result.score.wrongLinks === 0;
+  }
+  loadDotEnv();
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error("--websites --live needs OPENAI_API_KEY.");
+    return false;
+  }
+  const budget = inMemoryBudget(WEBSITE_LIVE_CAP_USD_MICROS);
+  const result = await runWebsiteEval({
+    live: {
+      deps: {
+        llm: loggingClient(
+          createOpenAiClient({ apiKey, model: WEBSITE_CHECK_MODEL }),
+        ),
+        budget,
+        model: WEBSITE_CHECK_MODEL,
+      },
+    },
+  });
+  const recorded = `${WEBSITE_CHECK_MODEL} ${new Date().toISOString().slice(0, 10)}`;
+  writeFileSync(
+    WEBSITE_CASES_PATH,
+    withLiveAnswers(
+      readFileSync(WEBSITE_CASES_PATH, "utf8"),
+      result.liveAnswers,
+      recorded,
+    ),
+  );
+  console.log(renderWebsiteReport(result));
+  console.log(
+    `Recorded ${result.liveAnswers.size} answers in ${WEBSITE_CASES_PATH}; format the file before committing. Spend: $${(budget.spent() / 1_000_000).toFixed(6)}`,
+  );
+  if (result.liveAnswers.size < result.llmCalls) {
+    console.error(
+      "Some cases kept their recorded answer: over-budget cases, or the cap was reached.",
+    );
+  }
+  return result.score.wrongLinks === 0;
+}
+
 function report(models?: readonly string[]): boolean {
   const cases = loadCases();
   const recordings = loadRecordings().filter(
@@ -417,6 +474,7 @@ async function main(): Promise<number> {
       replay: { type: "boolean", default: false },
       resolution: { type: "boolean", default: false },
       links: { type: "boolean", default: false },
+      websites: { type: "boolean", default: false },
       themes: { type: "boolean", default: false },
       check: { type: "boolean", default: false },
       describe: { type: "boolean", default: false },
@@ -453,6 +511,8 @@ async function main(): Promise<number> {
     console.log(body);
     return result.total.wrongLinks === 0 ? 0 : 1;
   }
+
+  if (values.websites) return (await websiteEval(values.live)) ? 0 : 1;
 
   if (values.themes) {
     if ((values.model?.length ?? 0) > 1) {
