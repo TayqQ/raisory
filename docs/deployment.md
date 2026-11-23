@@ -206,6 +206,9 @@ A wrong company name, or an article read wrongly, can be fixed from the private 
 | `rename-company` | `id` (company), `name` | Renames the company and gives it a new slug. The old name becomes an alias unless it is a placeholder. The old URL stops working |
 | `reextract-item` | `id` (source item) | Re-reads one article with the current prompt (and the placeholder retry), then resolves it again, so its event moves to the right company. Costs a fraction of a cent through the budget guard. Takes the ingest lock: if the hourly run is busy it prints `{"ran":false}`; run it again later |
 | `merge-company` | `id` (company to merge away), `keep_id` | The same as `pnpm entities merge --type company` |
+| `registry-list` | none | Lists open Companies House candidates with their evidence and the register URL (`pnpm registry list`) |
+| `registry-approve` | `id`: candidate ids, separated by spaces | Links those candidates (`pnpm registry approve`). Manual, so final. Unticked, it only previews |
+| `registry-reject` | `id`: candidate ids, separated by spaces | Rejects them, so they're never proposed again (`pnpm registry reject`). Unticked, it only previews |
 
 For a company created under a placeholder name, such as "startup": if the article names the company in its opening, run `reextract-item` on the article; the event moves to a company with the right name, and the placeholder company is left with no events. To keep the old company row instead (its id, first-seen date and registry links), rename it first, then re-extract: the event then resolves to the renamed company by name. If the rename preview lists `sameNameIds`, a company with that name already exists: merge instead. The same commands run locally as `pnpm entities rename` and `pnpm ingest reextract --item`.
 
