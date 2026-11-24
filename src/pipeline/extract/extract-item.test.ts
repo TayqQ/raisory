@@ -57,11 +57,11 @@ function trackingBudget(order: string[]): {
 }
 
 describe("extraction prompt", () => {
-  it("is version v3, states the contract, and stays under about 975 tokens", () => {
+  it("is version v4, states the contract, and stays under about 1,150 tokens", () => {
     const system = buildSystemPrompt();
-    expect(EXTRACTION_PROMPT_VERSION).toBe("v3");
+    expect(EXTRACTION_PROMPT_VERSION).toBe("v4");
     // v2 was about 896; the name rule for the article opening adds about 60 (D69).
-    expect(system.length / 4).toBeLessThan(975);
+    expect(system.length / 4).toBeLessThan(1150);
     expect(system).toContain("verbatim");
     expect(system).toContain("includesIndividualAngels");
     expect(system).toContain("websiteDomain");
@@ -150,7 +150,7 @@ describe("extractItem", () => {
       result: validExtraction,
       usage: { inputTokens: 30, outputTokens: 8 },
       costUsdMicros: expectedCost,
-      promptVersion: "v3",
+      promptVersion: "v4",
       model: "gpt-4.1-nano",
     });
   });

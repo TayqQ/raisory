@@ -777,5 +777,53 @@
       "isRelevant": false,
       "events": []
     }
+  },
+  {
+    "id": "es-bcomp-20m-eib-history-2026",
+    "sourceSlug": "eu-startups",
+    "url": "https://www.eu-startups.com/2026/11/bcomp-secures-e20-million-from-eib-to-scale-flax-fibre-based-alternatives-to-carbon-fibre-glass-fibre-and-plastics/",
+    "headline": "Bcomp secures €20 million from EIB to scale flax fibre-based alternatives to carbon fibre, glass fibre and plastics",
+    "summary": "Fribourg-based Bcomp, which makes flax-fibre materials that replace carbon fibre, glass fibre and plastics, secured €20 million in venture debt from the European Investment Bank. The company had previously closed a €37.6 million Series C led by EGS Beteiligungen in 2024, after an earlier Series B.",
+    "publishedAt": "2026-11-24T11:34:52+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Bcomp",
+          "countryCode": "CH",
+          "city": "Fribourg",
+          "roundType": "debt",
+          "amountText": "€20 million",
+          "leadInvestors": [],
+          "investors": ["European Investment Bank"],
+          "acquirerName": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "es-gradyent-20m-eib-history-2026",
+    "sourceSlug": "eu-startups",
+    "url": "https://www.eu-startups.com/2026/11/dutch-startup-gradyent-lands-e20-million-eib-loan-to-expand-digital-twin-technology-across-europes-heating-networks/",
+    "headline": "Gradyent lands €20 million EIB loan to expand digital twin technology across Europe’s heating networks",
+    "summary": "Rotterdam-based Gradyent, which builds digital twins that optimise district heating and cooling networks, took a €20 million venture loan from the European Investment Bank. It follows the €28 million growth round led by Blue Earth Capital that the company closed in 2025.",
+    "publishedAt": "2026-11-20T07:41:14+00:00",
+    "expected": {
+      "isRelevant": true,
+      "events": [
+        {
+          "type": "funding_round",
+          "companyName": "Gradyent",
+          "countryCode": "NL",
+          "city": "Rotterdam",
+          "roundType": "debt",
+          "amountText": "€20 million",
+          "leadInvestors": [],
+          "investors": ["European Investment Bank"],
+          "acquirerName": null
+        }
+      ]
+    }
   }
 ]

@@ -1,8 +1,10 @@
-export const EXTRACTION_PROMPT_VERSION = "v3";
+export const EXTRACTION_PROMPT_VERSION = "v4";
 
 const SYSTEM_PROMPT = `You extract completed startup and scale-up events from a headline, a feed summary and sometimes an article opening. Return JSON for the extraction_v2 schema. Every property is required. Use null when a value is unknown. Do not guess, and do not add fields.
 
 isRelevant is true only when the text reports a completed funding round, acquisition, or launch by a startup or scale-up. Rumours (in talks, seeking, planning to raise), valuations or secondary sales that are not a new raise, a venture firm raising its own fund, layoffs, earnings, events and conferences, opinion, and market commentary are not events. A roundup that names specific completed raises is relevant, and each named raise is its own event. If nothing qualifies, set isRelevant to false and events to an empty array.
+
+Report only what the text announces as new. An earlier round, acquisition or launch mentioned as the company's history ("it previously raised a €37.6 million Series C", "this follows its 2024 Series B") is not an event, even with an amount, date or investors. When one announcement has several parts, such as an equity round and a loan or grant, each part is its own event.
 
 events holds at most 10 objects:
 - type is funding_round, acquisition, or launch.
@@ -12,7 +14,9 @@ events holds at most 10 objects:
 - acquisition is present for acquisition and null otherwise. acquirerName is the buyer. acquirerDomain is set only when it appears in the text. acquirerCountryCode is an ISO alpha-2 code or null. priceText is the price copied verbatim, or null. currencyHint follows the same rule as funding.
 - launch is present for launch and null otherwise. A launch is a new product or service released by a startup or scale-up. kind is product, show_hn, launch_hn, open_source, or other. productName and url are null when unstated.
 
-Example: "ExampleCo raises $4M seed led by Example Ventures" is one funding_round. amountText is "$4M". The only investor is Example Ventures, kind vc, isLead true. includesIndividualAngels is false. websiteDomain is null because the text has no domain.`;
+Example: "ExampleCo raises $4M seed led by Example Ventures" is one funding_round. amountText is "$4M". The only investor is Example Ventures, kind vc, isLead true. includesIndividualAngels is false. websiteDomain is null because the text has no domain.
+
+Example: "ExampleCo lands €20M loan from the European Investment Bank. It raised a €15M Series B in 2024." is one funding_round: the €20M loan, roundType debt. The 2024 Series B is history and is left out.`;
 
 export interface ExtractionPromptInput {
   title: string;

@@ -6,14 +6,23 @@ import {
   buildUserPrompt,
 } from "./prompt";
 
-describe("extraction prompt v3", () => {
+describe("extraction prompt v4", () => {
   const system = buildSystemPrompt();
 
-  it("is version v3 and still names the v2 schema", () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe("v3");
+  it("is version v4 and still names the v2 schema", () => {
+    expect(EXTRACTION_PROMPT_VERSION).toBe("v4");
     expect(CURRENT_EXTRACTION_SCHEMA_NAME).toBe("extraction_v2");
     expect(system).toContain(CURRENT_EXTRACTION_SCHEMA_NAME);
     expect(system).not.toContain("extraction_v1");
+  });
+
+  it("leaves out earlier rounds mentioned as history, and splits a multi-part raise", () => {
+    expect(system).toContain("Report only what the text announces as new.");
+    expect(system).toContain(
+      "is not an event, even with an amount, date or investors",
+    );
+    expect(system).toContain("each part is its own event");
+    expect(system).toContain("The 2024 Series B is history and is left out.");
   });
 
   it("asks for regionText as written, and never derived from the city", () => {
