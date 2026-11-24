@@ -11,6 +11,7 @@ import {
   decideFormDLink,
   filingSignal,
   grantPostcodeSignal,
+  linkWebsiteFrom,
   locationSignal,
   registryNameMatch,
   registryNormalise,
@@ -18,6 +19,8 @@ import {
   type ChLinkCompany,
   type ChLinkInput,
   type FormDLinkCompany,
+  type LinkWebsite,
+  type WebsiteRowFacts,
 } from "./link-rules";
 
 const LEEDS = { label: "Leeds", lat: 53.8016, lon: -1.5472 };
@@ -649,6 +652,237 @@ describe("decideChLink (step 4)", () => {
         "09876543",
       ]);
     });
+  });
+});
+
+describe("linkWebsiteFrom (D65)", () => {
+  function row(overrides: Partial<WebsiteRowFacts> = {}): WebsiteRowFacts {
+    return {
+      domain: "brightwell.example",
+      status: "linked",
+      rule: "W2",
+      decidedBy: "auto",
+      companyNumberSeen: "13579246",
+      ...overrides,
+    };
+  }
+
+  it("takes a linked W2 or W3 website, and one a person approved", () => {
+    expect(linkWebsiteFrom(row())).toEqual({
+      domain: "brightwell.example",
+      rule: "W2",
+      companyNumber: "13579246",
+    });
+    expect(linkWebsiteFrom(row({ rule: "W3" }))?.rule).toBe("W3");
+    expect(
+      linkWebsiteFrom(row({ rule: "manual", decidedBy: "manual" }))?.rule,
+    ).toBe("manual");
+  });
+
+  it("never takes W1: its number came from the Companies House link", () => {
+    expect(linkWebsiteFrom(row({ rule: "W1" }))).toBeNull();
+    expect(linkWebsiteFrom(row({ rule: "W1", decidedBy: "manual" }))).toBe(
+      null,
+    );
+  });
+
+  it("never takes a row that is not linked, or another rule", () => {
+    for (const status of ["candidate", "rejected"] as const) {
+      expect(linkWebsiteFrom(row({ status }))).toBeNull();
+    }
+    for (const rule of ["X1", "X2", "X3", "C1", "C2", "none"] as const) {
+      expect(linkWebsiteFrom(row({ rule }))).toBeNull();
+    }
+    // A manual rule is only ever written by a person; an automatic one is ignored.
+    expect(linkWebsiteFrom(row({ rule: "manual" }))).toBeNull();
+    expect(
+      linkWebsiteFrom(
+        row({ rule: "manual", decidedBy: "manual", status: "rejected" }),
+      ),
+    ).toBeNull();
+  });
+
+  it("needs a valid number, and normalises it", () => {
+    expect(linkWebsiteFrom(row({ companyNumberSeen: null }))).toBeNull();
+    expect(linkWebsiteFrom(row({ companyNumberSeen: "00000000" }))).toBeNull();
+    expect(linkWebsiteFrom(row({ companyNumberSeen: "VAT123" }))).toBeNull();
+    expect(
+      linkWebsiteFrom(row({ companyNumberSeen: "3579246" }))?.companyNumber,
+    ).toBe("03579246");
+    expect(
+      linkWebsiteFrom(row({ companyNumberSeen: "sc 612345" }))?.companyNumber,
+    ).toBe("SC612345");
+  });
+});
+
+describe("decideChLink: website number (step 0b, D65)", () => {
+  const SITE: LinkWebsite = {
+    domain: "brightwell.example",
+    rule: "W2",
+    companyNumber: "13579246",
+  };
+
+  it("links an exact name with nothing conflicting, with no other signal and no filings", () => {
+    const result = decide(company({ website: SITE }), [candidate({}, null)]);
+    expect(result.outcome).toBe("linked");
+    expect(result.decisions).toEqual([
+      {
+        outcome: "linked",
+        registryId: "13579246",
+        method: "website_number",
+        reason: "website number on brightwell.example (rule W2), exact name",
+      },
+    ]);
+    expect(result.needsFilings).toEqual([]);
+  });
+
+  it("links a single-word name, which a name alone never links", () => {
+    const co = company({
+      names: ["Fernlight"],
+      website: { ...SITE, companyNumber: "SC612345" },
+    });
+    const p = { companyNumber: "SC612345", name: "FERNLIGHT LIMITED" };
+    expect(decide(co, [candidate(p)]).outcome).toBe("linked");
+    expect(decide({ ...co, website: null }, [candidate(p)]).outcome).toBe(
+      "candidates",
+    );
+  });
+
+  it("links on an exact previous name (a renamed legal entity)", () => {
+    const result = decide(company({ website: { ...SITE, rule: "manual" } }), [
+      candidate({
+        name: "OAKHEART SYSTEMS LTD",
+        previousNames: ["BRIGHTWELL ROBOTICS LTD"],
+      }),
+    ]);
+    expect(result.decisions[0]).toMatchObject({
+      outcome: "linked",
+      method: "website_number",
+      reason:
+        "website number on brightwell.example (approved in review), exact previous name",
+    });
+  });
+
+  it("makes a candidate when the name differs (a reseller) or is only a prefix (a parent)", () => {
+    const reseller = decide(company({ website: SITE }), [
+      candidate({ name: "SOUNDLINE DISTRIBUTION LTD" }),
+    ]);
+    expect(reseller.outcome).toBe("candidates");
+    expect(reseller.decisions[0]).toMatchObject({
+      outcome: "candidate",
+      reason: "website number on brightwell.example (rule W2), name differs",
+    });
+    const parent = decide(company({ website: SITE }), [
+      candidate({ name: "BRIGHTWELL ROBOTICS HOLDINGS LTD" }, [
+        sh01("2026-02-02"),
+      ]),
+    ]);
+    expect(parent.outcome).toBe("candidates");
+    expect(parent.decisions[0]?.reason).toContain("prefix name");
+  });
+
+  it("makes a candidate on any conflict: dissolved before the first event, too young", () => {
+    const dissolved = decide(
+      company({ website: SITE, events: [round("2025-02-11")] }),
+      [candidate({ status: "dissolved", ceasedOn: "2024-05-01" })],
+    );
+    expect(dissolved.outcome).toBe("candidates");
+    expect(dissolved.decisions[0]?.reason).toContain("closed too early");
+    const young = decide(company({ website: SITE }), [
+      candidate({ incorporatedOn: "2026-06-01" }),
+    ]);
+    expect(young.outcome).toBe("candidates");
+    expect(young.decisions[0]?.reason).toContain("too young");
+  });
+
+  it("makes a candidate for a company known to be abroad", () => {
+    const result = decide(company({ website: SITE, countryCode: "FR" }), [
+      candidate(),
+    ]);
+    expect(result.outcome).toBe("candidates");
+    expect(result.decisions[0]?.reason).toContain("company country is FR");
+  });
+
+  it("makes a candidate when a grant gives another number, and leaves the grant's own number to step 0", () => {
+    const other = decide(
+      company({ website: SITE, grantCompanyNumber: "10293847" }),
+      [
+        candidate({ companyNumber: "10293847", name: "NORTHGATE LTD" }),
+        candidate(),
+      ],
+    );
+    expect(other.outcome).toBe("candidates");
+    expect(
+      other.decisions.find((d) => d.registryId === "13579246")?.reason,
+    ).toContain("the grant gives number 10293847");
+
+    const same = decide(
+      company({ website: SITE, grantCompanyNumber: "13579246" }),
+      [candidate()],
+    );
+    expect(same.decisions[0]).toMatchObject({
+      outcome: "linked",
+      method: "grant_number",
+    });
+  });
+
+  it("makes no candidate for a number another company holds, only a merge candidate", () => {
+    const result = decide(
+      company({ website: SITE }),
+      [candidate()],
+      ["13579246"],
+    );
+    expect(result.outcome).toBe("none");
+    expect(result.mergeCandidates.map((m) => m.registryId)).toEqual([
+      "13579246",
+    ]);
+  });
+
+  it("never proposes a number a person rejected, and then does not block the search", () => {
+    const result = decide(
+      company({
+        website: { ...SITE, companyNumber: "11029384" },
+        rejectedNumbers: ["11029384"],
+      }),
+      [
+        candidate({ companyNumber: "11029384", name: "SOUNDLINE LTD" }),
+        candidate({}, [sh01("2026-02-02")]),
+      ],
+    );
+    expect(result.decisions).toEqual([
+      expect.objectContaining({ registryId: "11029384", outcome: "none" }),
+      expect.objectContaining({
+        registryId: "13579246",
+        outcome: "linked",
+        method: "name_filing",
+      }),
+    ]);
+  });
+
+  it("while the website shows a number that did not link, no other number links", () => {
+    const result = decide(
+      company({
+        website: { ...SITE, companyNumber: "11029384" },
+        location: LEEDS,
+      }),
+      [
+        candidate({
+          companyNumber: "11029384",
+          name: "BRIGHTWELL ROBOTICS HOLDINGS LTD",
+        }),
+        candidate({}, [sh01("2026-02-02")]),
+      ],
+    );
+    expect(result.outcome).toBe("candidates");
+    expect(result.decisions.map((d) => [d.registryId, d.outcome])).toEqual([
+      ["11029384", "candidate"],
+      ["13579246", "candidate"],
+    ]);
+    expect(result.decisions[1]?.reason).toContain(
+      "the website shows number 11029384",
+    );
+    // Filings are not asked for: they could not make a link.
+    expect(result.needsFilings).toEqual([]);
   });
 });
 

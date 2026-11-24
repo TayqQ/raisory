@@ -4,7 +4,14 @@
 
 import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { DATE_PRECISIONS, EVENT_TYPES, ROUND_TYPES } from "@/core/enums";
+import {
+  DATE_PRECISIONS,
+  EVENT_TYPES,
+  LINK_DECIDED_BY,
+  REGISTRY_LINK_STATUSES,
+  ROUND_TYPES,
+  WEBSITE_RULES,
+} from "@/core/enums";
 import type {
   CapitalFiling,
   FormDFacts,
@@ -15,6 +22,7 @@ import type { ConfirmableEvent } from "@/pipeline/registry/confirm-rules";
 import {
   decideChLink,
   decideFormDLink,
+  linkWebsiteFrom,
   type ChLinkCandidate,
   type ChLinkCompany,
   type ChLinkResult,
@@ -91,6 +99,21 @@ const chCaseSchema = z.object({
     grantPostcodes: z.array(z.string()).default([]),
     grantCompanyNumber: z.string().nullable().default(null),
     rejectedNumbers: z.array(z.string()).default([]),
+    /**
+     * The company's `company_websites` row (D65), as stored. The replay
+     * passes it through `linkWebsiteFrom`, so a W1 row is ignored as it is
+     * in the registry step.
+     */
+    website: z
+      .object({
+        domain: z.string(),
+        status: z.enum(REGISTRY_LINK_STATUSES).default("linked"),
+        rule: z.enum(WEBSITE_RULES),
+        decidedBy: z.enum(LINK_DECIDED_BY).default("auto"),
+        companyNumberSeen: z.string().nullable(),
+      })
+      .nullable()
+      .default(null),
   }),
   candidates: z.array(
     z.object({
@@ -220,7 +243,12 @@ function filingsOf(
 }
 
 function chCompanyOf(item: ChCase): ChLinkCompany {
-  return { ...item.company, events: toEvents(item.company.events) };
+  const { website, ...company } = item.company;
+  return {
+    ...company,
+    events: toEvents(company.events),
+    website: website === null ? null : linkWebsiteFrom(website),
+  };
 }
 
 function decideWith(
@@ -541,6 +569,10 @@ All of them make fewer automatic links than the spec tables (section 7.2 and 8.3
 ## Search hints (D62)
 
 Hints (a GBP round, a UK-only source, a UK town or region) decide only which companies with no stated country are searched. The rules above decide them unchanged: a filing still links an exact name (ch-57), and a prefix match or an exact name with no signal still goes to review (ch-58, ch-59).
+
+## Company numbers from websites (D65)
+
+A UK company number on the company's verified website (rule W2 or W3, or approved in review) is fetched before the search. It links, method \`website_number\`, only when the registry name or a previous name matches exactly and nothing conflicts (ch-64, ch-66, ch-68). A reseller's or a parent's number, a dissolved company, a registry that still has the old name, or a company known to be abroad goes to review (ch-61, ch-62, ch-63, ch-65, ch-69). While the website shows a number that did not link, no other number links automatically (ch-62). A W1 website never feeds the method, because W1 came from the Companies House link itself (ch-67).
 
 ## Every case
 

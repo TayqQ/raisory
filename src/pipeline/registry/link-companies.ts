@@ -1,4 +1,4 @@
-// Links companies to Companies House (spec-phase3 section 7.2, D53, D61).
+// Links companies to Companies House (spec-phase3 section 7.2, D53, D61, D65).
 // The decision is `decideChLink` from `link-rules.ts`, applied as it stands:
 // this file only gathers the facts, makes the requests the rules ask for, and
 // writes the outcome through `link-store.ts`.
@@ -18,6 +18,7 @@ import {
   companies,
   companyAliases,
   companyLocations,
+  companyWebsites,
   eventSources,
   events,
   extractions,
@@ -42,8 +43,10 @@ import {
 } from "./link-store";
 import {
   MAX_PREFIX_CANDIDATES,
+  WEBSITE_NUMBER_RULES,
   chConflicts,
   decideChLink,
+  linkWebsiteFrom,
   registryNameMatchDetail,
   registryNormalise,
   usableNames,
@@ -51,6 +54,7 @@ import {
   type ChLinkCompany,
   type ChLinkResult,
   type LinkLocation,
+  type LinkWebsite,
 } from "./link-rules";
 import {
   chHints,
@@ -262,6 +266,8 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
  * registry added are left out, so a demoted link cannot match on its own name.
  * A founded year from a registry is left out: the rules compare news years.
  * A location from the registered office is left out for the same reason.
+ * A website number comes only from a `linked` website verified by W2, W3 or
+ * a person (`linkWebsiteFrom`, D65), never W1.
  */
 export async function loadCompanyLinkFacts(
   db: Db,
@@ -337,6 +343,22 @@ export async function loadCompanyLinkFacts(
             ),
           ),
       ]);
+    const websites = await db
+      .select({
+        companyId: companyWebsites.companyId,
+        domain: companyWebsites.domain,
+        status: companyWebsites.status,
+        rule: companyWebsites.rule,
+        decidedBy: companyWebsites.decidedBy,
+        companyNumberSeen: companyWebsites.companyNumberSeen,
+      })
+      .from(companyWebsites)
+      .where(
+        and(
+          inArray(companyWebsites.companyId, ids),
+          eq(companyWebsites.status, "linked"),
+        ),
+      );
 
     const aliasesBy = new Map<number, string[]>();
     for (const row of aliases) pushTo(aliasesBy, row.companyId, row.alias);
@@ -380,6 +402,12 @@ export async function loadCompanyLinkFacts(
     for (const row of rejected) {
       pushTo(rejectedBy, row.companyId, row.registryId);
     }
+    // At most one linked website per company (a unique index).
+    const websiteBy = new Map<number, LinkWebsite>();
+    for (const row of websites) {
+      const website = linkWebsiteFrom(row);
+      if (website !== null) websiteBy.set(row.companyId, website);
+    }
 
     for (const row of base) {
       const names = [row.name, ...(aliasesBy.get(row.id) ?? [])];
@@ -416,6 +444,7 @@ export async function loadCompanyLinkFacts(
           grantPostcodes: postcodesBy.get(row.id) ?? [],
           grantCompanyNumber,
           rejectedNumbers: rejectedBy.get(row.id) ?? [],
+          website: websiteBy.get(row.id) ?? null,
         },
       });
     }
@@ -425,10 +454,12 @@ export async function loadCompanyLinkFacts(
 
 /**
  * A hash of the names and events a search uses, plus the other facts the rules
- * read. Manual rejections are left out: they never make a search due.
+ * read. Manual rejections are left out: they never make a search due. The
+ * website number is added only when there is one, so the hash of a company
+ * without one is what it was before D65 and no search becomes due for it.
  */
 export function chLinkFingerprint(company: ChLinkCompany): string {
-  const input = {
+  const input: Record<string, unknown> = {
     names: company.names.map(registryNormalise),
     countryCode: company.countryCode,
     foundedYear: company.foundedYear,
@@ -451,6 +482,9 @@ export function chLinkFingerprint(company: ChLinkCompany): string {
     grantPostcodes: [...company.grantPostcodes].sort(),
     grantCompanyNumber: company.grantCompanyNumber,
   };
+  if (company.website) {
+    input.website = [company.website.domain, company.website.companyNumber];
+  }
   return createHash("sha256").update(JSON.stringify(input)).digest("hex");
 }
 
@@ -515,11 +549,12 @@ async function extractedPlaces(
 }
 
 /**
- * Companies to search, in order (spec-phase3 section 7.2, D62): not merged,
- * not linked yet, and either with evidence (GB, a grant participant, a UK
- * location row) or, when the country is null or GB, with a hint: a GBP
- * round, a report from a UK-only source, or a UK town or region in the
- * extractions. A known country other than GB never takes a hint. The queue
+ * Companies to search, in order (spec-phase3 section 7.2, D62, D65): not
+ * merged, not linked yet, and either with evidence (GB, a grant participant, a
+ * UK location row) or, when the country is null or GB, with a company number
+ * on the verified website or a hint: a GBP round, a report from a UK-only
+ * source, or a UK town or region in the extractions. A known country other
+ * than GB never takes a hint or a website number. The queue
  * runs by tier (`chSearchTier`), then companies with a news report before
  * those whose events all come from grants (D63), then newest event first.
  */
@@ -537,6 +572,10 @@ export async function eligibleCompanies(db: Db): Promise<EligibleCompany[]> {
           ukSlugs.map((slug) => sql`${slug}`),
           sql`, `,
         )}))`;
+  const websiteNumber = sql<boolean>`exists (select 1 from company_websites cw where cw.company_id = companies.id and cw.status = 'linked' and cw.company_number_seen is not null and cw.rule in (${sql.join(
+    WEBSITE_NUMBER_RULES.map((rule) => sql`${rule}`),
+    sql`, `,
+  )}) and (cw.rule <> 'manual' or cw.decided_by = 'manual'))`;
   const linked = sql`exists (select 1 from registry_links rl where rl.company_id = companies.id and rl.registry = ${REGISTRY} and rl.status = 'linked')`;
   const latestEvent = sql<
     string | null
@@ -552,6 +591,7 @@ export async function eligibleCompanies(db: Db): Promise<EligibleCompany[]> {
       ukLocation,
       gbpRound,
       ukSource,
+      websiteNumber,
       latestEvent,
       hasNews,
     })
@@ -584,6 +624,7 @@ export async function eligibleCompanies(db: Db): Promise<EligibleCompany[]> {
     if (row.countryCode?.toUpperCase() === "GB") reasons.push("country_gb");
     if (row.ukLocation) reasons.push("uk_location");
     if (hintsApply(row.countryCode)) {
+      if (row.websiteNumber) reasons.push("website_number");
       if (row.gbpRound) reasons.push("gbp");
       if (row.ukSource) reasons.push("uk_source");
       const extracted = places.get(row.id);
@@ -848,6 +889,27 @@ async function linkOne(
     if (profile !== null) {
       const candidate = { profile, filings: null, officePostcodeShared: false };
       candidates.push(candidate);
+      const early = decide(facts, candidates, ctx.holders);
+      if (early.outcome === "linked") {
+        const outcome = await applyResult(ctx, facts, candidates, early);
+        await finishSearch(ctx, facts, fingerprint, outcome);
+        return;
+      }
+    }
+  }
+
+  // Step 0b (D65): a number on the company's verified website. When it links,
+  // nothing is searched.
+  const websiteNumber = normaliseCompanyNumber(company.website?.companyNumber);
+  if (
+    websiteNumber !== null &&
+    !rejected.has(websiteNumber) &&
+    !fetched.has(websiteNumber)
+  ) {
+    fetched.add(websiteNumber);
+    const profile = await fetchProfile(ctx, websiteNumber);
+    if (profile !== null) {
+      candidates.push({ profile, filings: null, officePostcodeShared: false });
       const early = decide(facts, candidates, ctx.holders);
       if (early.outcome === "linked") {
         const outcome = await applyResult(ctx, facts, candidates, early);

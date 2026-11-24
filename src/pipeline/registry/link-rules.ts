@@ -12,11 +12,19 @@
 //   automatically: the UK company is usually a subsidiary.
 // - A grant number (step 0) links only when nothing conflicts, and no other
 //   number links automatically while the grant names one.
+// - A number on the company's verified website (D65, step 0b) links only on
+//   an exact current or previous name with nothing conflicting, and no other
+//   number links automatically while the website shows one.
 // - A Form D links a single-word name only when amounts were compared.
 // - A Form D whose year of incorporation is more than 2 years from the news
 //   founded year conflicts, as for Companies House.
 
-import type { RegistrySearchOutcome } from "@/core/enums";
+import type {
+  LinkDecidedBy,
+  RegistryLinkStatus,
+  RegistrySearchOutcome,
+  WebsiteRule,
+} from "@/core/enums";
 import {
   normaliseCompanyNumber,
   type CapitalFiling,
@@ -188,6 +196,60 @@ export interface ChLinkCompany {
   grantCompanyNumber: string | null;
   /** Numbers a manual decision rejected for this company. */
   rejectedNumbers: string[];
+  /**
+   * A UK company number shown on the company's verified website (D65), from
+   * `linkWebsiteFrom`. Null or missing when there is none that may be used.
+   */
+  website?: LinkWebsite | null;
+}
+
+/** The website rules whose `linked` rows feed the `website_number` method (D65). */
+export const WEBSITE_NUMBER_RULES = ["W2", "W3", "manual"] as const;
+export type WebsiteNumberRule = (typeof WEBSITE_NUMBER_RULES)[number];
+
+/** A company number read from the company's own website. */
+export interface LinkWebsite {
+  domain: string;
+  /** How the website was verified: never W1. */
+  rule: WebsiteNumberRule;
+  /** Normalised. */
+  companyNumber: string;
+}
+
+/** The `company_websites` columns `linkWebsiteFrom` reads. */
+export interface WebsiteRowFacts {
+  domain: string;
+  status: RegistryLinkStatus;
+  rule: WebsiteRule;
+  decidedBy: LinkDecidedBy;
+  companyNumberSeen: string | null;
+}
+
+/**
+ * The website number the link rules may use, or null (D65). The row must be
+ * `linked` and show a valid UK company number, and the website must have been
+ * verified without a Companies House number: W2 (a stated domain with the
+ * name), W3 (a name match the LLM confirmed) or a person's approval in review
+ * (`manual`, decided by hand). W1 never feeds it: W1 means the page shows the
+ * number we had already linked, so using that number again would be circular.
+ */
+export function linkWebsiteFrom(row: WebsiteRowFacts): LinkWebsite | null {
+  if (row.status !== "linked") return null;
+  const number = normaliseCompanyNumber(row.companyNumberSeen);
+  if (number === null) return null;
+  if (row.rule === "W2" || row.rule === "W3") {
+    return { domain: row.domain, rule: row.rule, companyNumber: number };
+  }
+  if (row.rule === "manual" && row.decidedBy === "manual") {
+    return { domain: row.domain, rule: "manual", companyNumber: number };
+  }
+  return null;
+}
+
+function websiteText(website: LinkWebsite): string {
+  const how =
+    website.rule === "manual" ? "approved in review" : `rule ${website.rule}`;
+  return `website number on ${website.domain} (${how})`;
 }
 
 export interface ChLinkCandidate {
@@ -473,7 +535,8 @@ function availableSignals(
 }
 
 /**
- * Decides a company's Companies House link (section 7.2, steps 0, 2, 3, 4).
+ * Decides a company's Companies House link (section 7.2, steps 0, 2, 3, 4,
+ * and step 0b for a website number, D65).
  * Returns a decision for every candidate, the overall outcome, and which
  * candidates need capital filings before the decision is final.
  */
@@ -489,6 +552,17 @@ export function decideChLink(input: ChLinkInput): ChLinkResult {
     ? (normaliseCompanyNumber(company.grantCompanyNumber) ??
       company.grantCompanyNumber)
     : null;
+  const website = company.website ?? null;
+  // A number the grant also gives is decided by step 0 alone.
+  const websiteNumber =
+    website === null
+      ? null
+      : (normaliseCompanyNumber(website.companyNumber) ??
+        website.companyNumber);
+  const ownWebsiteNumber =
+    websiteNumber !== null && websiteNumber !== grantNumber
+      ? websiteNumber
+      : null;
 
   const seen = new Set<string>();
   const assessed: Assessed[] = [];
@@ -579,7 +653,11 @@ export function decideChLink(input: ChLinkInput): ChLinkResult {
         registryId: item.number,
         reason: "rejected by a manual decision",
       });
-    } else if (item.name.match === "none" && item.number !== grantNumber) {
+    } else if (
+      item.name.match === "none" &&
+      item.number !== grantNumber &&
+      item.number !== ownWebsiteNumber
+    ) {
       decisions.set(item.number, {
         outcome: "none",
         registryId: item.number,
@@ -625,11 +703,6 @@ export function decideChLink(input: ChLinkInput): ChLinkResult {
     }
   }
 
-  const open = assessed.filter(
-    (a) => !a.rejected && a.conflicts.length === 0 && a.number !== grantNumber,
-  );
-  const exact = open.filter((a) => a.name.match === "exact");
-  const prefix = open.filter((a) => a.name.match === "prefix");
   const grantNote =
     grantNumber !== null && !rejected.has(grantNumber)
       ? `the grant gives number ${grantNumber}`
@@ -639,12 +712,69 @@ export function decideChLink(input: ChLinkInput): ChLinkResult {
       ? `company country is ${company.countryCode.toUpperCase()}`
       : null;
 
+  // Step 0b (D65): a number shown on the company's verified website. It links
+  // only on an exact current or previous name with nothing conflicting, while
+  // no grant names another number and the company is not known to be abroad.
+  // Anything else is a candidate: the site may be a reseller's or show a
+  // parent's number. A number another company holds is left to the merge
+  // candidate, as in step 0.
+  if (website !== null && ownWebsiteNumber !== null) {
+    const item = assessed.find((a) => a.number === ownWebsiteNumber);
+    if (item && !item.rejected) {
+      const shown = websiteText(website);
+      const blocker = grantNote ?? foreign;
+      if (
+        item.name.match === "exact" &&
+        item.conflicts.length === 0 &&
+        blocker === null
+      ) {
+        decisions.set(item.number, {
+          outcome: "linked",
+          registryId: item.number,
+          method: "website_number",
+          reason: joinReason([
+            `${shown}, ${nameText(item.name)}`,
+            foundedYearNote(company, item.candidate.profile),
+          ]),
+        });
+        return finish("the website number decided");
+      }
+      if (!linkedToOthers.has(item.number)) {
+        const name =
+          item.name.match === "exact"
+            ? nameText(item.name)
+            : item.name.match === "prefix"
+              ? "prefix name"
+              : "name differs";
+        decisions.set(item.number, {
+          outcome: "candidate",
+          registryId: item.number,
+          reason: joinReason([`${shown}, ${name}`, blocker, ...item.conflicts]),
+        });
+      }
+    }
+  }
+
+  const open = assessed.filter(
+    (a) =>
+      !a.rejected &&
+      a.conflicts.length === 0 &&
+      a.number !== grantNumber &&
+      a.number !== ownWebsiteNumber,
+  );
+  const exact = open.filter((a) => a.name.match === "exact");
+  const prefix = open.filter((a) => a.name.match === "prefix");
+  const websiteNote =
+    ownWebsiteNumber !== null && !rejected.has(ownWebsiteNumber)
+      ? `the website shows number ${ownWebsiteNumber}`
+      : null;
+
   if (exact.length === 1) {
     const item = exact[0];
     if (item === undefined) return finish("no candidate left");
     const signals = availableSignals(company, item.candidate);
     const words = wordCount(item.name.companyName ?? "");
-    const blocker = grantNote ?? foreign;
+    const blocker = grantNote ?? websiteNote ?? foreign;
     const s3Matters =
       blocker === null &&
       signals.s1 === null &&

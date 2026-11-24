@@ -9,6 +9,7 @@ import {
   chFilings,
   companies,
   companyLocations,
+  companyWebsites,
   eventSources,
   events,
   extractions,
@@ -32,9 +33,11 @@ import {
 import {
   RequestBudget,
   RunDeadline,
+  chLinkFingerprint,
   describeError,
   eligibleCompanies,
   linkCompanies,
+  loadCompanyLinkFacts,
 } from "./link-companies";
 import { createWindowLimiter } from "./rate-limit";
 import { recordLink } from "./link-store";
@@ -1073,5 +1076,174 @@ describe("linkCompanies: country hints (D62)", () => {
     expect(client.requestsMade()).toBe(3);
     expect(stats.stoppedAtLimit).toBe(true);
     expect(stats.companiesSearched).toBe(3);
+  });
+});
+
+describe("linkCompanies: company numbers on websites (D65)", () => {
+  async function addWebsite(
+    companyId: number,
+    values: Partial<typeof companyWebsites.$inferInsert> = {},
+  ) {
+    await db.insert(companyWebsites).values({
+      companyId,
+      domain: "brightwell.example",
+      status: "linked",
+      rule: "W2",
+      source: "article",
+      evidence: "test",
+      companyNumberSeen: "13579246",
+      checkedAt: NOW,
+      decidedBy: "auto",
+      fingerprint: "test",
+      ...values,
+    });
+  }
+
+  function brightwellClient() {
+    return recordingClient({
+      companies: [BRIGHTWELL],
+      search: { "Brightwell Robotics": [hit(BRIGHTWELL)] },
+    });
+  }
+
+  it("links by the number on a W2 website with one request and no search, and writes no country", async () => {
+    const company = await insertCompany("Brightwell Robotics", {
+      countryCode: null,
+    });
+    await addRound(company.id, "2026-03-10");
+    await addWebsite(company.id);
+    const { client, calls } = brightwellClient();
+    const stats = await run(client);
+
+    expect(calls).toEqual(["profile:13579246"]);
+    const [link] = await linksOf(company.id);
+    expect(link).toMatchObject({
+      registryId: "13579246",
+      status: "linked",
+      method: "website_number",
+      decidedBy: "auto",
+    });
+    expect(link!.reason).toBe(
+      "website number on brightwell.example (rule W2), exact name",
+    );
+    const row = await companyRow(company.id);
+    expect(row.ukCompanyNumber).toBe("13579246");
+    expect(row.countryCode).toBeNull();
+    expect(stats.linkedByMethod).toEqual({ website_number: 1 });
+    expect((await searchOf(company.id))?.outcome).toBe("linked");
+  });
+
+  it("links by a website a person approved in review", async () => {
+    const company = await insertCompany("Brightwell Robotics");
+    await addRound(company.id, "2026-03-10");
+    await addWebsite(company.id, {
+      rule: "manual",
+      decidedBy: "manual",
+      source: "guess",
+    });
+    await run(brightwellClient().client);
+    expect(await linksOf(company.id)).toEqual([
+      expect.objectContaining({ status: "linked", method: "website_number" }),
+    ]);
+  });
+
+  it("never uses a W1 website: the search decides alone", async () => {
+    const company = await insertCompany("Brightwell Robotics");
+    await addRound(company.id, "2026-03-10");
+    await addWebsite(company.id, { rule: "W1" });
+    const { client, calls } = brightwellClient();
+    await run(client);
+
+    expect(calls[0]).toBe("search:Brightwell Robotics");
+    // An exact name with no signal: review, as with no website at all.
+    expect(await linksOf(company.id)).toEqual([
+      expect.objectContaining({ registryId: "13579246", status: "candidate" }),
+    ]);
+    const [queued] = await eligibleCompanies(db);
+    expect(queued?.reasons).not.toContain("website_number");
+  });
+
+  it("queues at tier 0 only for a linked W2, W3 or approved website with a number, and only when the country is null or GB", async () => {
+    const cases: Array<[string, Partial<typeof companyWebsites.$inferInsert>]> =
+      [
+        ["Site W2", {}],
+        ["Site W3", { rule: "W3" }],
+        ["Site Approved", { rule: "manual", decidedBy: "manual" }],
+        ["Site W1", { rule: "W1" }],
+        ["Site Candidate", { status: "candidate", rule: "C1" }],
+        ["Site No Number", { companyNumberSeen: null }],
+      ];
+    const ids = new Map<number, string>();
+    for (const [index, [name, values]] of cases.entries()) {
+      const company = await insertCompany(name, { countryCode: null });
+      ids.set(company.id, name);
+      await addWebsite(company.id, {
+        domain: `site-${index}.example`,
+        ...values,
+      });
+    }
+    const abroad = await insertCompany("Site Abroad", { countryCode: "FR" });
+    await addWebsite(abroad.id, { domain: "abroad.example" });
+
+    const queue = await eligibleCompanies(db);
+    expect(
+      queue.map((c) => [ids.get(c.id) ?? c.id, c.tier, c.reasons]),
+    ).toEqual([
+      ["Site W2", 0, ["website_number"]],
+      ["Site W3", 0, ["website_number"]],
+      ["Site Approved", 0, ["website_number"]],
+    ]);
+  });
+
+  it("makes a candidate of another company's number on the site, and then links nothing else", async () => {
+    const company = await insertCompany("Brightwell Robotics");
+    await addRound(company.id, "2026-03-10");
+    await setLocation(company.id, LEEDS);
+    await addWebsite(company.id, { companyNumberSeen: "11029384" });
+    const parent = profile({
+      companyNumber: "11029384",
+      name: "BRIGHTWELL ROBOTICS HOLDINGS LTD",
+    });
+    const client = fakeChClient({
+      companies: [BRIGHTWELL, parent],
+      search: { "Brightwell Robotics": [hit(BRIGHTWELL)] },
+      filings: { "13579246": [sh01("2026-02-02")] },
+    });
+    await run(client);
+
+    const links = await linksOf(company.id);
+    expect(links.map((l) => [l.registryId, l.status])).toEqual([
+      ["11029384", "candidate"],
+      ["13579246", "candidate"],
+    ]);
+    expect(links[1]!.reason).toContain("the website shows number 11029384");
+    expect((await companyRow(company.id)).ukCompanyNumber).toBeNull();
+    expect((await searchOf(company.id))?.outcome).toBe("candidates");
+  });
+
+  it("searches again once a website is verified, and keeps the fingerprint of a company without one", async () => {
+    const company = await insertCompany("Brightwell Robotics");
+    await addRound(company.id, "2026-03-10");
+    const client = brightwellClient().client;
+    await run(client);
+    expect((await linksOf(company.id))[0]?.status).toBe("candidate");
+
+    const before = (await loadCompanyLinkFacts(db, [company.id])).get(
+      company.id,
+    )!.company;
+    expect(before.website).toBeNull();
+    const withoutKey = { ...before };
+    delete withoutKey.website;
+    expect(chLinkFingerprint(before)).toBe(chLinkFingerprint(withoutKey));
+
+    await addWebsite(company.id);
+    await run(client);
+    expect(await linksOf(company.id)).toEqual([
+      expect.objectContaining({
+        registryId: "13579246",
+        status: "linked",
+        method: "website_number",
+      }),
+    ]);
   });
 });

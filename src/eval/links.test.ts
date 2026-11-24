@@ -42,6 +42,8 @@ describe("link eval", () => {
       "same-name-different-company",
       "form-d",
       "country-hint",
+      "website-number",
+      "w1-circular",
     ]) {
       expect(tags, tag).toContain(tag);
     }

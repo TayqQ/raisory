@@ -34,6 +34,13 @@ describe("chSearchTier", () => {
     expect(chSearchTier([])).toBeNull();
   });
 
+  it("puts a company number on the verified website first, as evidence (D65)", () => {
+    expect(chSearchTier(["website_number"])).toBe(0);
+    expect(chSearchTier(["website_number", "uk_place"])).toBe(0);
+    expect(searchedOnHintsOnly(["website_number", "gbp"])).toBe(false);
+    expect(chSearchNote(["website_number", "gbp"])).toBeNull();
+  });
+
   it("notes the hints only when nothing else put the company in the queue", () => {
     expect(searchedOnHintsOnly(["uk_source", "gbp"])).toBe(true);
     expect(chSearchNote(["uk_source", "gbp"])).toBe(

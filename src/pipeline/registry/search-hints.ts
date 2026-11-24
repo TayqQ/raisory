@@ -2,19 +2,23 @@
 // country, so a UK company with `country_code` null was never searched in
 // Companies House. Hints decide who is searched and in what order. They never
 // change the link rules, and they are never written to `companies.country_code`:
-// an inferred country is not shown as fact.
+// an inferred country is not shown as fact. A company number on the company's
+// verified website (D65) is evidence of the same kind: it puts the company in
+// the queue first, and it is never written to `companies.country_code` either.
 
 import { matchUkCity } from "@/lib/geo/uk-places";
 import { ukRegionFromText } from "@/lib/geo/uk-region-names";
 import { SOURCE_COUNTRY_HINTS } from "@/pipeline/sources";
 
 /**
- * Why a company is searched in Companies House. The first four are evidence
- * the search had before D62. The last three are hints, used only when the
- * country is null or GB.
+ * Why a company is searched in Companies House. The first five are evidence:
+ * four the search had before D62, and `website_number` (D65), a UK company
+ * number on the company's verified website. The last three are hints. The
+ * website number and the hints are used only when the country is null or GB.
  */
 export type ChSearchReason =
   | "grant_number"
+  | "website_number"
   | "grant"
   | "country_gb"
   | "uk_location"
@@ -32,6 +36,7 @@ export type FormDSearchHint = "us_country" | "usd" | "us_source";
 
 const EVIDENCE: ReadonlySet<ChSearchReason> = new Set([
   "grant_number",
+  "website_number",
   "grant",
   "country_gb",
   "uk_location",
@@ -87,14 +92,17 @@ export function searchedOnHintsOnly(
 
 /**
  * The queue tier, lowest first, or null when the company is not searched:
- * 0 a grant gives a company number; 1 other evidence (GB country, a grant,
+ * 0 a grant gives a company number, or the company's verified website shows
+ * one (D65); 1 other evidence (GB country, a grant,
  * a UK location row); 2 two or more hints; 3 a GBP round or a UK-only
  * source; 4 a UK town or region only.
  */
 export function chSearchTier(
   reasons: readonly ChSearchReason[],
 ): number | null {
-  if (reasons.includes("grant_number")) return 0;
+  if (reasons.includes("grant_number") || reasons.includes("website_number")) {
+    return 0;
+  }
   if (reasons.some((reason) => EVIDENCE.has(reason))) return 1;
   const hints = chHints(reasons);
   if (hints.length >= 2) return 2;

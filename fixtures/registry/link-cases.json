@@ -1959,6 +1959,330 @@
       "expected": { "outcome": "none" }
     },
     {
+      "id": "ch-61",
+      "kind": "companies_house",
+      "tags": ["website-number", "reseller"],
+      "note": "D65. The article gave the domain and the page carries the name (W2), but the footer shows the number of the reseller that runs the site. The registry name differs, so review, never a link.",
+      "company": {
+        "names": ["Corvane Audio"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-05-14",
+            "amountUsdMinor": 310000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 },
+        "website": {
+          "domain": "corvaneaudio.example",
+          "rule": "W2",
+          "companyNumberSeen": "09182736"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "09182736",
+            "name": "SOUNDLINE DISTRIBUTION LTD",
+            "incorporatedOn": "2015-03-02",
+            "officePostcode": "N1 7GU"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-62",
+      "kind": "companies_house",
+      "tags": ["website-number", "parent", "holdings"],
+      "note": "D65. The site (W3) shows the parent's number, a prefix match. The search also finds the exact-name subsidiary with an SH01 14 days before the round, which alone would link by filing. The two disagree on the legal entity, so both go to review.",
+      "company": {
+        "names": ["Halcyon Robotics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-04-15",
+            "amountUsdMinor": 250000000
+          }
+        ],
+        "location": { "label": "London", "lat": 51.5078, "lon": -0.1245 },
+        "website": {
+          "domain": "halcyonrobotics.example",
+          "rule": "W3",
+          "companyNumberSeen": "11029384"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "11029384",
+            "name": "HALCYON ROBOTICS HOLDINGS LTD",
+            "incorporatedOn": "2017-08-10",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": []
+        },
+        {
+          "profile": {
+            "companyNumber": "12938475",
+            "name": "HALCYON ROBOTICS LTD",
+            "incorporatedOn": "2019-02-01",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": [{ "actionDate": "2026-04-01" }]
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-63",
+      "kind": "companies_house",
+      "tags": ["website-number", "dissolved"],
+      "note": "D65. The site (W2) still shows the number of a company with the exact name that was dissolved before the company's first event. A conflict, so review.",
+      "company": {
+        "names": ["Pellora Health"],
+        "events": [
+          {
+            "roundType": "pre_seed",
+            "announcedOn": "2025-02-11",
+            "amountUsdMinor": 50000000
+          },
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-01-20",
+            "amountUsdMinor": 180000000
+          }
+        ],
+        "website": {
+          "domain": "pellorahealth.example",
+          "rule": "W2",
+          "companyNumberSeen": "09988776"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "09988776",
+            "name": "PELLORA HEALTH LTD",
+            "status": "dissolved",
+            "incorporatedOn": "2016-05-04",
+            "ceasedOn": "2024-05-01",
+            "officePostcode": "BS1 4DJ"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-64",
+      "kind": "companies_house",
+      "tags": ["website-number", "rebrand", "previous-name"],
+      "note": "D65. The legal entity was renamed; the site (W2) and the news still use the old name, which Companies House lists as a previous name. The site's number with an exact previous name links, with no other signal needed.",
+      "company": {
+        "names": ["Lattice Forge"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-02-24",
+            "amountUsdMinor": 220000000
+          }
+        ],
+        "website": {
+          "domain": "latticeforge.example",
+          "rule": "W2",
+          "companyNumberSeen": "13572468"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13572468",
+            "name": "OAKHEART SYSTEMS LTD",
+            "previousNames": ["LATTICE FORGE LTD"],
+            "incorporatedOn": "2021-07-19",
+            "officePostcode": "M1 3HU"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "13572468" }
+    },
+    {
+      "id": "ch-65",
+      "kind": "companies_house",
+      "tags": ["website-number", "rebrand"],
+      "note": "D65. The company trades under a new brand, and the registry still has the old legal name with no previous name that matches. The site's number may well be right, but nothing in the facts ties the two names, so review.",
+      "company": {
+        "names": ["Quillon Bio"],
+        "events": [
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-06-30",
+            "amountUsdMinor": 1400000000
+          }
+        ],
+        "website": {
+          "domain": "quillonbio.example",
+          "rule": "W2",
+          "companyNumberSeen": "12765430"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "12765430",
+            "name": "TARNWELL THERAPEUTICS LTD",
+            "incorporatedOn": "2020-01-14",
+            "officePostcode": "CB2 1TN"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-66",
+      "kind": "companies_house",
+      "tags": ["website-number", "short-name", "scottish"],
+      "note": "D65. A single-word name with no location and no SH01, which alone would go to review. The site (W2) shows the Scottish number of the company with the exact name, so it links by website number.",
+      "company": {
+        "names": ["Fernlight"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-03-03",
+            "amountUsdMinor": 120000000
+          }
+        ],
+        "website": {
+          "domain": "fernlight.example",
+          "rule": "W2",
+          "companyNumberSeen": "SC612345"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "SC612345",
+            "name": "FERNLIGHT LIMITED",
+            "incorporatedOn": "2018-11-20",
+            "officePostcode": "EH3 9DR"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "SC612345" }
+    },
+    {
+      "id": "ch-67",
+      "kind": "companies_house",
+      "tags": [
+        "website-number",
+        "w1-circular",
+        "short-name",
+        "same-name-different-company"
+      ],
+      "note": "D65. The site was linked by W1 only because it showed the number of an earlier automatic link, since demoted. Site and number may both belong to a namesake in another city, so the website number is ignored and the search decides alone: an exact single-word name with no signal goes to review.",
+      "company": {
+        "names": ["Brackenridge"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-07-07",
+            "amountUsdMinor": 150000000
+          }
+        ],
+        "location": { "label": "Leeds", "lat": 53.8016, "lon": -1.5472 },
+        "website": {
+          "domain": "brackenridge.example",
+          "rule": "W1",
+          "companyNumberSeen": "14455667"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "14455667",
+            "name": "BRACKENRIDGE LTD",
+            "incorporatedOn": "2022-03-01",
+            "officePostcode": "BS1 4DJ"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
+      "id": "ch-68",
+      "kind": "companies_house",
+      "tags": ["website-number", "manual-website"],
+      "note": "D65. A person approved the website in review. Its page shows the number of the company with the exact name, which links by website number, with no other signal.",
+      "company": {
+        "names": ["Ovenden Kinetics"],
+        "events": [
+          {
+            "roundType": "seed",
+            "announcedOn": "2026-08-19",
+            "amountUsdMinor": 260000000
+          }
+        ],
+        "website": {
+          "domain": "ovendenkinetics.example",
+          "rule": "manual",
+          "decidedBy": "manual",
+          "companyNumberSeen": "15550987"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "15550987",
+            "name": "OVENDEN KINETICS LTD",
+            "incorporatedOn": "2023-04-03",
+            "officePostcode": "SO14 3HL"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "linked", "registryId": "15550987" }
+    },
+    {
+      "id": "ch-69",
+      "kind": "companies_house",
+      "tags": ["website-number", "foreign-country"],
+      "note": "D65. News says the company is French. Its site (W2) shows the number of a UK company with the exact name, usually a subsidiary, so review.",
+      "company": {
+        "names": ["Velmora"],
+        "countryCode": "FR",
+        "events": [
+          {
+            "roundType": "series_a",
+            "announcedOn": "2026-05-05",
+            "amountUsdMinor": 900000000
+          }
+        ],
+        "website": {
+          "domain": "velmora.example",
+          "rule": "W2",
+          "companyNumberSeen": "13998877"
+        }
+      },
+      "candidates": [
+        {
+          "profile": {
+            "companyNumber": "13998877",
+            "name": "VELMORA LTD",
+            "incorporatedOn": "2022-09-12",
+            "officePostcode": "EC2A 4NE"
+          },
+          "filings": []
+        }
+      ],
+      "expected": { "outcome": "candidates" }
+    },
+    {
       "id": "fd-01",
       "kind": "sec_form_d",
       "tags": ["worked-example", "form-d"],
