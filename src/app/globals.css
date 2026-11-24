@@ -299,6 +299,27 @@ html {
   }
 }
 
+/*
+ * Every <select> draws its own chevron, 12px in from the right edge, so the
+ * arrow is inset like the text is on the left. The right padding keeps long
+ * option text from running under it. Unlayered on purpose: it beats the
+ * padding utilities on the controls that use it.
+ */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.25rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  text-overflow: ellipsis;
+}
+
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,

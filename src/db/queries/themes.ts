@@ -206,6 +206,45 @@ export async function listThemes(
     }));
 }
 
+export interface SectorCompanyCount {
+  /** Null for active themes with no sector yet. */
+  sector: Sector | null;
+  /** Distinct live companies in at least one active theme of the sector. */
+  companyCount: number;
+}
+
+/**
+ * Distinct live companies per sector, largest first (ties in `SECTORS` order,
+ * no sector last). A company in two themes of one sector counts once, so this
+ * is not the sum of the theme counts. Sectors with no companies are left out.
+ */
+export async function listSectorCompanyCounts(
+  db: Db,
+): Promise<SectorCompanyCount[]> {
+  const rows = await db
+    .select({
+      sector: themes.sector,
+      count: sql<number>`count(distinct ${companyThemes.companyId})::int`,
+    })
+    .from(companyThemes)
+    .innerJoin(themes, eq(themes.id, companyThemes.themeId))
+    .innerJoin(companies, eq(companies.id, companyThemes.companyId))
+    .where(and(eq(themes.status, "active"), isNull(companies.mergedIntoId)))
+    .groupBy(themes.sector);
+  const result = rows
+    .filter((row) => row.count > 0)
+    .map((row) => ({
+      sector: isSector(row.sector) ? row.sector : null,
+      companyCount: row.count,
+    }));
+  const order = (sector: Sector | null): number =>
+    sector === null ? SECTORS.length : SECTORS.indexOf(sector);
+  return result.sort(
+    (a, b) =>
+      b.companyCount - a.companyCount || order(a.sector) - order(b.sector),
+  );
+}
+
 function emptyStageMix(): Record<RoundType, number> {
   return Object.fromEntries(ROUND_TYPES.map((type) => [type, 0])) as Record<
     RoundType,

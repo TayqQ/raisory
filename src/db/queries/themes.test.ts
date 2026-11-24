@@ -1,10 +1,17 @@
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ROUND_TYPES } from "@/core/enums";
 import { addWeeks, lastCompleteWeek } from "@/lib/weeks";
 import type { Db } from "../client";
 import { seedDatabase } from "../seed";
 import { createTestDb, type TestDb } from "../testing";
-import { getThemeDetail, listThemes, resolveThemeSlugs } from "./themes";
+import { companies, companyThemes, themes } from "../schema";
+import {
+  getThemeDetail,
+  listSectorCompanyCounts,
+  listThemes,
+  resolveThemeSlugs,
+} from "./themes";
 
 // Wednesday 11 November 2026. The last complete week starts on 2026-11-02.
 const NOW = new Date("2026-11-11T12:00:00.000Z");
@@ -111,5 +118,54 @@ describe("theme queries", () => {
       ]),
     ).toEqual(["grid-batteries", "heat-pumps"]);
     expect(await resolveThemeSlugs(db, [])).toEqual([]);
+  });
+
+  it("counts a company in two themes of one sector once", async () => {
+    const before = await listSectorCompanyCounts(db);
+    const energyBefore =
+      before.find((row) => row.sector === "climate-energy")?.companyCount ?? 0;
+    const themeCounts = await listThemes(db, { sector: "climate-energy" });
+    expect(themeCounts.length).toBeGreaterThanOrEqual(2);
+
+    const [company, merged] = await db
+      .insert(companies)
+      .values([
+        {
+          slug: "two-themes-co",
+          name: "Two Themes Co",
+          normalisedName: "two themes co",
+        },
+        { slug: "merged-co", name: "Merged Co", normalisedName: "merged co" },
+      ])
+      .returning({ id: companies.id });
+    await db
+      .update(companies)
+      .set({ mergedIntoId: company!.id })
+      .where(eq(companies.id, merged!.id));
+    const energyThemes = await db
+      .select({ id: themes.id })
+      .from(themes)
+      .where(
+        and(eq(themes.sector, "climate-energy"), eq(themes.status, "active")),
+      );
+    expect(energyThemes).toHaveLength(2);
+    await db.insert(companyThemes).values(
+      energyThemes.flatMap((theme) => [
+        { companyId: company!.id, themeId: theme.id, tagCount: 1 },
+        { companyId: merged!.id, themeId: theme.id, tagCount: 1 },
+      ]),
+    );
+
+    const after = await listSectorCompanyCounts(db);
+    const energyAfter = after.find((row) => row.sector === "climate-energy");
+    // One new live company, in two themes: +1, not +2. The merged one is ignored.
+    expect(energyAfter?.companyCount).toBe(energyBefore + 1);
+    const summed = (await listThemes(db, { sector: "climate-energy" })).reduce(
+      (sum, theme) => sum + theme.companyCount,
+      0,
+    );
+    expect(summed).toBeGreaterThan(energyAfter?.companyCount ?? 0);
+    const counts = after.map((row) => row.companyCount);
+    expect(counts).toEqual([...counts].sort((a, b) => b - a));
   });
 });

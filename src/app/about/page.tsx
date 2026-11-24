@@ -3,14 +3,16 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "How Raisory collects startup news, extracts structured facts, and what we store.",
+    "How Raisory collects startup news and public records, extracts structured facts, and what we store.",
 };
 
 const GITHUB_ISSUES_URL = "https://github.com/TayqQ/raisory/issues";
 const AGPL_URL = "https://www.gnu.org/licenses/agpl-3.0.en.html";
 const LINK_CLASS = "font-medium text-brand underline-offset-2 hover:underline";
 
-/** Phase 1 enabled RSS feeds (see `docs/sources.md`). */
+const CREDIT = "Headlines and links with clear source credit.";
+
+/** Enabled RSS feeds, in the order of `SOURCES` in `src/pipeline/sources.ts`. */
 const ENABLED_SOURCES = [
   {
     name: "TechCrunch Venture",
@@ -42,6 +44,26 @@ const ENABLED_SOURCES = [
     attribution:
       "Headlines and links for non-commercial use; commercial redistribution needs UKTN consent.",
   },
+  {
+    name: "Tech Funding News",
+    url: "https://techfundingnews.com/category/funding/feed/",
+    attribution: CREDIT,
+  },
+  {
+    name: "The Recursive",
+    url: "https://www.therecursive.com/rss/",
+    attribution: CREDIT,
+  },
+  {
+    name: "BusinessCloud",
+    url: "https://businesscloud.co.uk/feed/",
+    attribution: CREDIT,
+  },
+  {
+    name: "Silicon Republic",
+    url: "https://www.siliconrepublic.com/feed/",
+    attribution: CREDIT,
+  },
 ] as const;
 
 export default function AboutPage() {
@@ -53,28 +75,44 @@ export default function AboutPage() {
           Raisory (formerly SignalFeed) collects public startup news from RSS
           feeds, uses a language model to extract structured facts (funding
           rounds, acquisitions, launches), merges duplicate reports into company
-          and event records, and shows them on a read-only website. It is open
-          source and designed to run at close to zero cost.
+          and event records, links them to public registers, and shows them on a
+          read-only website. It is open source and designed to run at close to
+          zero cost.
         </p>
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">How data flows</h2>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-ink">
             <li>
-              <strong className="font-medium text-ink">Collect.</strong>{" "}
-              Scheduled jobs poll enabled RSS feeds and store new headlines,
-              links and feed-provided summaries for processing.
+              <strong className="font-medium text-ink">Collect.</strong> Every
+              hour, a scheduled job polls the enabled RSS feeds and stores new
+              headlines, links and feed-provided summaries. Where a feed carries
+              the article body, the opening of it is kept too. Before it reads a
+              publisher&rsquo;s feed it checks that site&rsquo;s robots.txt, and
+              it skips a feed the site does not allow.
             </li>
             <li>
               <strong className="font-medium text-ink">Extract.</strong> A
               keyword prefilter selects relevant items; each passes through one
               LLM call that returns validated JSON (amounts stay as reported
-              text and are parsed in code).
+              text and are parsed in code). The call reads the headline, the
+              feed summary and the article opening, when there is one. If the
+              model gives a description such as &ldquo;startup&rdquo; instead of
+              the company&rsquo;s name, the item is tried once more with a
+              second model. If the name is still a placeholder, that event is
+              held back and not published.
             </li>
             <li>
               <strong className="font-medium text-ink">Merge.</strong> Entity
               resolution links extractions to companies, investors and events;
               ambiguous names go to a review queue rather than being guessed.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">Link.</strong> Once a
+              day, separate jobs collect Innovate UK grants, link companies to
+              Companies House, and collect SEC Form D filings. They are used to
+              link companies and to confirm raises (see below). The daily run
+              also groups tags into themes.
             </li>
           </ol>
           <p className="mt-3 text-ink">
@@ -82,13 +120,21 @@ export default function AboutPage() {
             rates. Ingestion runs on GitHub Actions; the public website is
             read-only and cannot trigger collection or LLM calls.
           </p>
+          <p className="mt-3 text-ink">
+            Extraction uses an OpenAI model, gpt-5.6-luna by default. Every call
+            is priced against a monthly spending cap, £3 by default, before it
+            is made. Ingestion pauses when the cap is reached.
+          </p>
         </section>
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">Sources</h2>
+          <h3 className="mt-3 text-base font-semibold">News feeds</h3>
           <p className="mt-2 text-ink">
-            Phase 1 uses these verified RSS feeds. Sifted is disabled (no feed
-            summary; terms conflict with LLM extraction).
+            Raisory reads these RSS feeds. Sifted is disabled (no feed summary;
+            terms conflict with LLM extraction). A feed is skipped while its
+            site&rsquo;s robots.txt does not allow it, so a feed on this list
+            may add nothing for a while.
           </p>
           <ul className="mt-4 space-y-4">
             {ENABLED_SOURCES.map((source) => (
@@ -107,14 +153,42 @@ export default function AboutPage() {
               </li>
             ))}
           </ul>
+          <h3 className="mt-6 text-base font-semibold">Registers and data</h3>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-ink">
+            <li>
+              <strong className="font-medium text-ink">
+                UKRI Gateway to Research
+              </strong>
+              : Innovate UK grants, collected daily (see{" "}
+              <a href="#grants" className={LINK_CLASS}>
+                grants
+              </a>
+              ).
+            </li>
+            <li>
+              <strong className="font-medium text-ink">Companies House</strong>:
+              company links, registered facts and share allotment filings, once
+              a day.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">SEC EDGAR</strong>: Form
+              D filings for US companies, once a day.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">
+                ECB reference rates
+              </strong>
+              : for currency conversion.
+            </li>
+          </ul>
         </section>
 
         <section className="mt-10">
           <h2 className="text-xl font-semibold">What we store</h2>
           <p className="mt-3 text-ink">
             We store headlines, links and extracted facts; we never republish
-            article text. Feed summaries are kept only for LLM input and are not
-            shown on the site.
+            article text. Feed summaries and article openings are kept only for
+            LLM input and are not shown on the site.
           </p>
           <p className="mt-3 text-ink">
             We do not keep records of individual people (founders, angels,
@@ -133,6 +207,11 @@ export default function AboutPage() {
             <li>
               Automated extraction can misread headlines; amounts and dates are
               shown as reported and parsed, not independently verified.
+            </li>
+            <li>
+              If no text names the company, we leave the event out rather than
+              guess. A story that only says &ldquo;a startup&rdquo; is therefore
+              missing.
             </li>
             <li>
               History starts when collection started. RSS feeds do not backfill
@@ -356,8 +435,8 @@ export default function AboutPage() {
             </li>
             <li>
               Grants can be loaded back to an earlier date than the news, so
-              grant history may reach further back. The source is updated about
-              monthly.
+              grant history may reach further back. We check for new grants
+              daily, but the source updates its project data about monthly.
             </li>
           </ul>
         </section>
@@ -412,6 +491,13 @@ export default function AboutPage() {
               A missed link leaves a gap. A wrong link would put another
               company&rsquo;s facts on the page, so we prefer gaps. Many UK
               companies are not linked.
+            </li>
+            <li>
+              SEC Form D filings link to a US company in a similar way. The
+              issuer&rsquo;s name has to match exactly, nothing may conflict
+              (such as a company known to be outside the US, or a year of
+              incorporation far from the founded year), and the filing has to
+              confirm a raise in its date window.
             </li>
             <li>
               A link can still be wrong. If you spot one,{" "}

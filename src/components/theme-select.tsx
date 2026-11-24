@@ -3,7 +3,7 @@ import type { ThemeRef } from "@/core/read-models";
 import { SECTORS, SECTOR_LABELS, type Sector } from "@/core/sectors";
 
 const inputClass =
-  "mt-1 w-full border border-line-strong bg-surface px-2 py-2 text-sm text-ink";
+  "mt-1 w-full border border-line-strong bg-surface px-3 py-2 text-sm text-ink";
 const labelClass = "block text-sm font-medium";
 
 /**
