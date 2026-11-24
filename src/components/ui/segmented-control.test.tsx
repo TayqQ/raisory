@@ -6,8 +6,8 @@ const options = [
   { value: "list", label: "List" },
   { value: "cards", label: "Cards" },
   {
-    value: "split",
-    label: "Split",
+    value: "wide",
+    label: "Wide",
     disabled: true,
     title: "Needs a wider screen",
   },
@@ -41,7 +41,7 @@ describe("SegmentedControl", () => {
     expect(screen.getByRole("radio", { name: "Cards" })).toHaveFocus();
     expect(onChange).toHaveBeenLastCalledWith("cards");
 
-    // Split is disabled, so the next step wraps round to List.
+    // Wide is disabled, so the next step wraps round to List.
     fireEvent.keyDown(screen.getByRole("radio", { name: "Cards" }), {
       key: "ArrowRight",
     });
@@ -71,9 +71,9 @@ describe("SegmentedControl", () => {
     render(
       <SegmentedControl label="View" options={options} defaultValue="list" />,
     );
-    const split = screen.getByRole("radio", { name: "Split" });
-    expect(split).toBeDisabled();
-    expect(split).toHaveAttribute("title", "Needs a wider screen");
+    const wide = screen.getByRole("radio", { name: "Wide" });
+    expect(wide).toBeDisabled();
+    expect(wide).toHaveAttribute("title", "Needs a wider screen");
   });
 
   it("follows the value prop when controlled", () => {

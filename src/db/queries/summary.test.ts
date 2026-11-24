@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { RoundType } from "@/core/enums";
 import type { FundingFilters } from "@/core/read-models";
@@ -17,10 +16,11 @@ import {
 import { createTestDb, type TestDb } from "../testing";
 import {
   getFundingSummary,
-  getQuickViewCounts,
   getSectorCounts,
   previousWindow,
-  quickViewBase,
+  summaryPeriodRange,
+  summaryRange,
+  summaryScope,
 } from "./summary";
 
 async function addCompany(db: Db, name: string): Promise<number> {
@@ -107,6 +107,98 @@ describe("previousWindow", () => {
     expect(previousWindow({ to: "2026-10-31" })).toBeNull();
     expect(previousWindow({})).toBeNull();
     expect(previousWindow({ from: "2026-10-31", to: "2026-10-01" })).toBeNull();
+  });
+});
+
+describe("summaryPeriodRange", () => {
+  const TODAY = "2026-11-24";
+
+  it("runs back from today like the list's date presets", () => {
+    expect(summaryPeriodRange("7d", TODAY)).toEqual({
+      from: "2026-11-17",
+      to: TODAY,
+    });
+    expect(summaryPeriodRange("30d", TODAY)).toEqual({
+      from: "2026-10-25",
+      to: TODAY,
+    });
+    expect(summaryPeriodRange("90d", TODAY)).toEqual({
+      from: "2026-08-26",
+      to: TODAY,
+    });
+  });
+
+  it("starts 12 months on the same date a year back", () => {
+    expect(summaryPeriodRange("12m", TODAY)).toEqual({
+      from: "2025-11-24",
+      to: TODAY,
+    });
+  });
+
+  it("compares with the period of the same length before", () => {
+    expect(previousWindow(summaryPeriodRange("30d", TODAY))).toEqual({
+      from: "2026-09-24",
+      to: "2026-10-24",
+    });
+  });
+});
+
+describe("summaryRange", () => {
+  const period = { from: "2026-10-25", to: "2026-11-24" };
+
+  it("is the period when the list has no dates", () => {
+    expect(summaryRange(period, {})).toEqual(period);
+  });
+
+  it("is the period when the list's dates cover it", () => {
+    expect(summaryRange(period, { from: "2026-08-26" })).toEqual(period);
+  });
+
+  it("is the overlap with the list's dates", () => {
+    expect(summaryRange(period, { from: "2026-11-01" })).toEqual({
+      from: "2026-11-01",
+      to: "2026-11-24",
+    });
+    expect(
+      summaryRange(period, { from: "2026-09-01", to: "2026-10-31" }),
+    ).toEqual({ from: "2026-10-25", to: "2026-10-31" });
+    expect(summaryRange(period, { to: "2026-11-10" })).toEqual({
+      from: "2026-10-25",
+      to: "2026-11-10",
+    });
+  });
+
+  it("is null when they do not overlap", () => {
+    expect(
+      summaryRange(period, { from: "2026-01-01", to: "2026-03-31" }),
+    ).toBeNull();
+  });
+});
+
+describe("summaryScope", () => {
+  it("covers the period and compares with the one before", () => {
+    expect(summaryScope("7d", {}, "2026-11-24")).toEqual({
+      period: "7d",
+      periodRange: { from: "2026-11-17", to: "2026-11-24" },
+      range: { from: "2026-11-17", to: "2026-11-24" },
+      previous: { from: "2026-11-09", to: "2026-11-16" },
+    });
+  });
+
+  it("compares the overlap with the same number of days before it", () => {
+    const scope = summaryScope("30d", { from: "2026-11-15" }, "2026-11-24");
+    expect(scope.range).toEqual({ from: "2026-11-15", to: "2026-11-24" });
+    expect(scope.previous).toEqual({ from: "2026-11-05", to: "2026-11-14" });
+  });
+
+  it("has no range and nothing to compare when nothing overlaps", () => {
+    const scope = summaryScope(
+      "7d",
+      { from: "2026-01-01", to: "2026-01-31" },
+      "2026-11-24",
+    );
+    expect(scope.range).toBeNull();
+    expect(scope.previous).toBeNull();
   });
 });
 
@@ -249,100 +341,6 @@ describe("getFundingSummary", () => {
       sectors: [],
       biggest: [],
     });
-  });
-});
-
-describe("getQuickViewCounts", () => {
-  let test: TestDb;
-  let db: Db;
-
-  const VIEWS = [
-    { id: "all", criteria: {} },
-    { id: "uk", criteria: { countryCodes: ["GB"] } },
-    { id: "confirmed", criteria: { evidence: "confirmed" as const } },
-    {
-      id: "early",
-      criteria: {
-        roundTypes: ["pre_seed", "seed", "series_a"] as RoundType[],
-      },
-    },
-    { id: "big", criteria: { minGbpMinor: 1_000_000_000 } },
-  ];
-
-  async function company(name: string, country: string): Promise<number> {
-    const [row] = await db
-      .insert(companies)
-      .values({
-        slug: slugify(name),
-        name,
-        normalisedName: normaliseCompanyName(name),
-        countryCode: country,
-      })
-      .returning({ id: companies.id });
-    if (!row) throw new Error("Company insert failed");
-    return row.id;
-  }
-
-  beforeEach(async () => {
-    test = await createTestDb();
-    db = test.db;
-    const uk = await company("Leeds Robotics", "GB");
-    const us = await company("Austin Robotics", "US");
-    await addRound(db, uk, "2026-09-02", 1_500_000_000, "series_a");
-    await addRound(db, uk, "2026-09-03", 200_000_000, "seed");
-    const confirmed = await addRound(db, us, "2026-09-04", null, "series_b");
-    await db
-      .update(events)
-      .set({ evidence: "confirmed" })
-      .where(eq(events.id, confirmed));
-    await addRound(db, us, "2026-09-05", 2_000_000_000, "growth");
-    // Grants stay out of every tab, as they are out of the default list.
-    await addRound(db, uk, "2026-09-06", 5_000_000_000, "grant");
-  });
-
-  afterEach(async () => {
-    await test.close();
-  });
-
-  it("counts every tab under the same base filters", async () => {
-    expect(await getQuickViewCounts(db, filters(), VIEWS)).toEqual({
-      all: 4,
-      uk: 2,
-      confirmed: 1,
-      early: 2,
-      big: 2,
-    });
-  });
-
-  it("keeps the other filters and drops the tabs' own keys", async () => {
-    const counts = await getQuickViewCounts(
-      db,
-      filters({
-        from: "2026-09-03",
-        countryCodes: ["US"],
-        roundTypes: ["growth"],
-      }),
-      VIEWS,
-    );
-    expect(counts).toEqual({ all: 3, uk: 1, confirmed: 1, early: 1, big: 1 });
-  });
-
-  it("is zero for every tab over an empty set", async () => {
-    const counts = await getQuickViewCounts(
-      db,
-      filters({ from: "2030-01-01" }),
-      VIEWS,
-    );
-    expect(Object.values(counts)).toEqual([0, 0, 0, 0, 0]);
-  });
-
-  it("works out the base filters", () => {
-    expect(
-      quickViewBase(
-        filters({ q: "robot", evidence: "confirmed", countryCodes: ["GB"] }),
-        VIEWS,
-      ),
-    ).toEqual(filters({ q: "robot" }));
   });
 });
 

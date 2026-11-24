@@ -59,6 +59,18 @@
   --stage-late: var(--data-5);
   --stage-other: var(--data-8);
 
+  /* Stage labels: a soft fill with stage-coloured text (4.5:1 or more) */
+  --stage-early-soft: #d3f1e6;
+  --stage-early-ink: #0b5e47;
+  --stage-seed-soft: #d2ecf9;
+  --stage-seed-ink: #0a5a83;
+  --stage-venture-soft: #dfe5fc;
+  --stage-venture-ink: #1f3f9c;
+  --stage-late-soft: #ece1fb;
+  --stage-late-ink: #5b2f9e;
+  --stage-other-soft: #e5e8ee;
+  --stage-other-ink: #3f4a5f;
+
   /* App shell */
   --nav-bg: #ffffff;
   --nav-ink: #0e1c3b;
@@ -136,6 +148,16 @@
     --data-6: #f27fb2;
     --data-7: #c2d45c;
     --data-8: #a3aec2;
+    --stage-early-soft: #103b33;
+    --stage-early-ink: #6fe0c1;
+    --stage-seed-soft: #0f3550;
+    --stage-seed-ink: #7fd0fa;
+    --stage-venture-soft: #1d2d5e;
+    --stage-venture-ink: #a9c1ff;
+    --stage-late-soft: #2f2257;
+    --stage-late-ink: #cbb3fb;
+    --stage-other-soft: #252e3f;
+    --stage-other-ink: #c3cad8;
     --nav-bg: #070e1b;
     --nav-ink: #c9d3e6;
     --nav-muted: #8d9ab3;
@@ -190,6 +212,16 @@
   --data-6: #f27fb2;
   --data-7: #c2d45c;
   --data-8: #a3aec2;
+  --stage-early-soft: #103b33;
+  --stage-early-ink: #6fe0c1;
+  --stage-seed-soft: #0f3550;
+  --stage-seed-ink: #7fd0fa;
+  --stage-venture-soft: #1d2d5e;
+  --stage-venture-ink: #a9c1ff;
+  --stage-late-soft: #2f2257;
+  --stage-late-ink: #cbb3fb;
+  --stage-other-soft: #252e3f;
+  --stage-other-ink: #c3cad8;
   --nav-bg: #070e1b;
   --nav-ink: #c9d3e6;
   --nav-muted: #8d9ab3;
@@ -274,6 +306,16 @@
   --color-stage-venture: var(--stage-venture);
   --color-stage-late: var(--stage-late);
   --color-stage-other: var(--stage-other);
+  --color-stage-early-soft: var(--stage-early-soft);
+  --color-stage-early-ink: var(--stage-early-ink);
+  --color-stage-seed-soft: var(--stage-seed-soft);
+  --color-stage-seed-ink: var(--stage-seed-ink);
+  --color-stage-venture-soft: var(--stage-venture-soft);
+  --color-stage-venture-ink: var(--stage-venture-ink);
+  --color-stage-late-soft: var(--stage-late-soft);
+  --color-stage-late-ink: var(--stage-late-ink);
+  --color-stage-other-soft: var(--stage-other-soft);
+  --color-stage-other-ink: var(--stage-other-ink);
 }
 
 html {

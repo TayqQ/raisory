@@ -26,7 +26,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
-  <img src="docs/images/hero-light.png" alt="The Raisory funding page: a summary of the money raised, by sector and biggest rounds, above a list of recent seed and Series A rounds with a preview of the selected company">
+  <img src="docs/images/hero-light.png" alt="The Raisory funding page: a summary panel of the money raised in the last 30 days, by sector and biggest rounds, above a list of recent seed and Series A rounds">
 </picture>
 
 ## What Raisory is
@@ -40,9 +40,9 @@ It's built for two kinds of people:
 
 ### What you can do with it
 
-- **Scan the market.** See how much was raised and the median round, which sectors are busiest and the biggest rounds, for any filter.
+- **Scan the market.** See how much was raised and the median round, which sectors are busiest and the biggest rounds, over the last 7 days, 30 days, 90 days or 12 months, for any filter.
 - **Filter properly.** Search, then filter by sector (ranked by recent activity), stage, deal size, date, place and "confirmed by an official filing". Every filter is a shareable URL.
-- **Work the way you like.** Use a dense list, cards, or a split view with a live company preview and keyboard navigation (`j` / `k`). The site remembers your choice.
+- **Work the way you like.** Use a dense list with keyboard navigation (`j` / `k`), or cards. The site remembers your choice.
 - **Trust what you read.** Company pages show the latest round with its proof ("Shares allotted on 2 October 2026, Companies House SH01"), the funding history, the investors, plain-English signals and the official registry facts.
 - **Use it anywhere.** It has light and dark themes, a phone layout with a bottom tab bar, and the core filters work without JavaScript.
 
@@ -116,7 +116,7 @@ The interesting problems here aren't the UI. They're precision, cost and trust.
 - **Product craft.**
   - **Design system:** a small set of shared tokens and primitives, with light and dark themes whose contrast is enforced by tests.
   - **Responsive app shell:** a sidebar on desktop, an icon rail on laptops and bottom tabs on phones.
-  - **Accessibility:** a keyboard-friendly split view, and filters that are plain GET forms, so shared URLs and no-JavaScript visits work.
+  - **Accessibility:** a keyboard-friendly list, stage labels whose contrast is tested in both themes, and filters that are plain GET forms, so shared URLs and no-JavaScript visits work.
 - **Decisions are written down.** 60+ architecture decisions in [`docs/decisions.md`](docs/decisions.md), and 80+ scoped task specs in [`docs/tasks/`](docs/tasks) that each change was built and reviewed against.
 
 **Stack:** TypeScript, Next.js 16 (App Router), React 19, Tailwind CSS 4, Postgres on Neon with Drizzle ORM and pgvector, Zod, the OpenAI API, GitHub Actions, Vercel, Vitest and PGlite.

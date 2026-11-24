@@ -7,23 +7,20 @@ import { Amount } from "@/components/ui/amount";
 import { Monogram } from "@/components/ui/monogram";
 import { Stat } from "@/components/ui/stat";
 import { RoundName } from "@/components/rounds/round-row-parts";
+import { chipLabel } from "@/components/rounds/round-row-parts";
+import type { DateRange, SummaryScope } from "@/db/queries/summary";
 import { formatDate, formatMoneyShort, formatRoundType } from "@/lib/format";
 import {
-  DATE_PRESET_LABELS,
   fundingFiltersHref,
-  matchDatePreset,
   serialiseFundingCriteria,
 } from "@/lib/funding-filters";
+import {
+  SUMMARY_PERIOD_LABELS,
+  type SummaryPeriod,
+} from "@/lib/view-preference";
 import { SectorBars, type SectorBar } from "./sector-bars";
-import { SummaryControls } from "./summary-state";
-import { chipLabel } from "@/components/rounds/round-row-parts";
-
-const DAY_MS = 86_400_000;
-
-function dayNumber(isoDate: string): number {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  return Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1) / DAY_MS;
-}
+import { SummaryPeriodLinks } from "./summary-period";
+import { HideSummaryButton, KeepHiddenToggle } from "./summary-state";
 
 /** "1 Sep to 30 Sep 2026", or with both years when they differ. */
 export function dateRange(from: string, to: string): string {
@@ -34,42 +31,33 @@ export function dateRange(from: string, to: string): string {
   return `${sameYear ? start.replace(/ \d{4}$/, "") : start} to ${end}`;
 }
 
+function sameRange(a: DateRange, b: DateRange): boolean {
+  return a.from === b.from && a.to === b.to;
+}
+
 /**
- * The window the summary covers, in words, and the window it compares with.
- * Without a date filter it covers every round the other filters match and
- * makes no comparison. A start with no end runs to `today`, matching
- * `previousWindow` in `src/db/queries/summary.ts`.
+ * The summary's dates in words: the header line that states the period, a
+ * short note when the list's own dates cut it (null when they do not), and
+ * the days it compares with.
  */
-export function summaryWindow(
-  filters: Pick<FundingFilters, "from" | "to">,
-  today: string,
-): {
-  label: string;
-  previous: { from: string; to: string; label: string } | null;
+export function describeScope(scope: SummaryScope): {
+  heading: string;
+  note: string | null;
+  previous: string | null;
 } {
-  const { from, to } = filters;
-  if (!from && !to) return { label: "All rounds we hold", previous: null };
-  if (!from && to) return { label: `Up to ${formatDate(to)}`, previous: null };
-  const start = from as string;
-  const end = to ?? today;
-  const length = dayNumber(end) - dayNumber(start) + 1;
-  const range = dateRange(start, end);
-  const preset = matchDatePreset(filters, today);
-  const label = preset ? `${DATE_PRESET_LABELS[preset]}, ${range}` : range;
-  if (!Number.isFinite(length) || length < 1) return { label, previous: null };
-  const prevTo = new Date((dayNumber(start) - 1) * DAY_MS)
-    .toISOString()
-    .slice(0, 10);
-  const prevFrom = new Date((dayNumber(start) - length) * DAY_MS)
-    .toISOString()
-    .slice(0, 10);
+  const { period, periodRange, range, previous } = scope;
+  const heading = `${SUMMARY_PERIOD_LABELS[period]} · ${dateRange(periodRange.from, periodRange.to)}`;
+  let note: string | null = null;
+  if (!range) {
+    note =
+      "The list's dates fall outside this period, so there is nothing to summarise.";
+  } else if (!sameRange(range, periodRange)) {
+    note = `Covers ${dateRange(range.from, range.to)} only, where this period overlaps the list's dates.`;
+  }
   return {
-    label,
-    previous: {
-      from: prevFrom,
-      to: prevTo,
-      label: dateRange(prevFrom, prevTo),
-    },
+    heading,
+    note,
+    previous: previous ? dateRange(previous.from, previous.to) : null,
   };
 }
 
@@ -90,7 +78,9 @@ export function describeChange(
     return { direction: "none", text: "Nothing to compare" };
   }
   if (current === previous) return { direction: "level", text: "Level" };
-  if (previous === 0) return { direction: "up", text: "Up from none" };
+  // Usually the period before falls where history had not started, so an
+  // arrow up from zero would claim growth that was not seen.
+  if (previous === 0) return { direction: "none", text: "Nothing to compare" };
   const percent = ((current - previous) / previous) * 100;
   const rounded = Math.round(Math.abs(percent));
   const amount = rounded === 0 ? "less than 1%" : `${rounded}%`;
@@ -124,16 +114,17 @@ function roundsText(count: number): string {
   return count === 1 ? "1 round" : `${count.toLocaleString("en-GB")} rounds`;
 }
 
-/** The light panel around each block inside the summary. */
-const PANEL =
-  "min-w-0 rounded-[var(--radius-lg)] border border-line bg-surface";
+/** A block inside the summary panel, on the panel's own surface. */
+const BLOCK = "min-w-0 rounded-[var(--radius)] border border-line";
 
 /**
- * The "What's happening" summary (from direction B) for the same filters as
- * the list: £ raised, rounds and the median against the previous window of the
- * same length; sectors ranked by £ (or rounds), each a link that filters the
- * list; and the three biggest rounds. A section of the page, not a card; its
- * header has the close control (see `summary-state.tsx`).
+ * The "What's happening" summary (from direction B), a panel you can close.
+ * It covers a recent period (7 days to 12 months, 30 by default, picked in its
+ * header) for the list's other filters: £ raised, rounds and the median
+ * against the period of the same length before; sectors ranked by £ (or
+ * rounds), each a link that filters the list; and the three biggest rounds.
+ * When the list has its own dates the summary covers their overlap with the
+ * period and says so.
  *
  * Layout, with no dead space:
  * - phones: the stat tiles in a row, then sectors, then biggest rounds;
@@ -144,90 +135,114 @@ const PANEL =
 export function FundingSummary({
   summary,
   filters,
-  today,
+  scope,
+  periodHrefs,
 }: {
   summary: FundingSummaryData;
+  /** The list's filters, for the sector links and the "matching" note. */
   filters: FundingFilters;
-  /** YYYY-MM-DD (UTC). */
-  today: string;
+  scope: SummaryScope;
+  /** The current page with each period set, for the period control. */
+  periodHrefs: Readonly<Record<SummaryPeriod, string>>;
 }) {
-  const span = summaryWindow(filters, today);
+  const words = describeScope(scope);
   const narrowed =
     serialiseFundingCriteria({ ...filters, from: undefined, to: undefined })
       .length > 0;
-  const subtitle = narrowed
-    ? `${span.label} · rounds matching your filters`
-    : span.label;
-  const previous = span.previous ? summary.previous : null;
+  const previous = scope.previous ? summary.previous : null;
 
   return (
-    <section aria-labelledby="summary-heading">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h2
-            id="summary-heading"
-            className="font-display text-[20px] font-semibold text-ink"
-          >
-            What&apos;s happening
-          </h2>
-          <p className="text-[13px] text-muted">{subtitle}</p>
+    <section
+      aria-labelledby="summary-heading"
+      className="rounded-[var(--radius-lg)] border border-line bg-surface"
+    >
+      {/*
+       * Phones: the title and "Hide summary" share the first line, then the
+       * period in words, then the period control. From `sm` the control and
+       * the button sit on the right of the title and the period.
+       */}
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-line px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-x-4 sm:gap-y-0">
+        <h2
+          id="summary-heading"
+          className="col-start-1 row-start-1 min-w-0 font-display text-[20px] font-semibold text-ink"
+        >
+          What&apos;s happening
+        </h2>
+        <p className="col-span-2 col-start-1 row-start-2 text-[13px] text-muted sm:col-span-1">
+          {words.heading}
+          {narrowed ? " · rounds matching your filters" : ""}
+        </p>
+        <div className="col-span-2 col-start-1 row-start-3 min-w-0 sm:col-span-1 sm:col-start-2 sm:row-span-2 sm:row-start-1">
+          <SummaryPeriodLinks period={scope.period} hrefs={periodHrefs} />
         </div>
-        <SummaryControls />
-      </div>
-      <div className="mt-3">
+        <div className="col-start-2 row-start-1 justify-self-end sm:col-start-3 sm:row-span-2">
+          <HideSummaryButton />
+        </div>
+      </header>
+
+      <div className="p-3 sm:p-4">
+        {words.note ? (
+          <p className="mb-3 text-[13px] text-ink">{words.note}</p>
+        ) : null}
         {summary.count === 0 ? (
           <EmptyWindow
             summary={summary}
-            dated={Boolean(filters.from || filters.to)}
-            previousLabel={span.previous?.label}
+            hasRange={scope.range !== null}
+            previousLabel={words.previous}
           />
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-rows-[auto_1fr]">
             <div className="min-w-0 md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1">
-              <Headline
-                summary={summary}
-                previous={previous}
-                previousLabel={span.previous?.label ?? null}
-              />
+              <Headline summary={summary} previous={previous} />
             </div>
             <div
-              className={`${PANEL} px-4 py-3 xl:col-start-2 xl:row-span-2 xl:row-start-1`}
+              className={`${BLOCK} px-4 py-3 xl:col-start-2 xl:row-span-2 xl:row-start-1`}
             >
               <SectorBars
                 headingId="summary-sectors"
                 sectors={sectorBars(summary, filters)}
               />
             </div>
-            <div className={`${PANEL} px-4 py-3 xl:col-start-1 xl:row-start-2`}>
+            <div className={`${BLOCK} px-4 py-3 xl:col-start-1 xl:row-start-2`}>
               <BiggestRounds summary={summary} />
             </div>
           </div>
         )}
       </div>
+
+      <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line px-4 py-2.5">
+        <p className="min-w-0 text-xs text-muted">
+          {previous && words.previous
+            ? `Changes compare with ${words.previous}, the period of the same length before.`
+            : "No earlier period to compare with."}
+        </p>
+        <KeepHiddenToggle />
+      </footer>
     </section>
   );
 }
 
 function EmptyWindow({
   summary,
-  dated,
+  hasRange,
   previousLabel,
 }: {
   summary: FundingSummaryData;
-  dated: boolean;
-  previousLabel: string | undefined;
+  /** False when the list's dates and the period do not overlap. */
+  hasRange: boolean;
+  previousLabel: string | null;
 }) {
   return (
-    <div>
+    <div className="px-1 py-2">
       <p className="font-display text-[17px] font-semibold text-ink">
-        {dated ? "No rounds in this window" : "No rounds to summarise"}
+        No rounds in this period
       </p>
       <p className="mt-1 text-[13px] text-muted">
-        {dated
-          ? "Nothing matches these filters between these dates."
-          : "Nothing matches these filters yet."}
+        {hasRange
+          ? "Nothing matches these filters in these dates. Try a longer period."
+          : "Choose a longer period, or change the list's dates."}
         {summary.previous && previousLabel
-          ? ` ${roundsText(summary.previous.count)} in the window before (${previousLabel}).`
+          ? ` ${roundsText(summary.previous.count)} in the period before (${previousLabel}).`
           : ""}
       </p>
     </div>
@@ -237,56 +252,46 @@ function EmptyWindow({
 function Headline({
   summary,
   previous,
-  previousLabel,
 }: {
   summary: FundingSummaryData;
   previous: FundingSummaryData["previous"];
-  previousLabel: string | null;
 }) {
   const total = summary.totalGbpMinor > 0 ? summary.totalGbpMinor : null;
   const change = (current: number | null, before: number | null) =>
     previous ? <ChangeLine change={describeChange(current, before)} /> : null;
-  const tile = `${PANEL} px-2.5 py-2.5 sm:px-4 sm:py-3`;
+  const tile = `${BLOCK} px-2.5 py-2.5 sm:px-4 sm:py-3`;
   return (
-    <div>
-      <div className="grid grid-cols-3 items-stretch gap-2 sm:gap-3">
-        <div className={tile}>
-          <Stat
-            label="Raised, in GBP"
-            size="lg"
-            value={money(total)}
-            sub={change(
-              summary.totalGbpMinor,
-              previous ? previous.totalGbpMinor : null,
-            )}
-          />
-        </div>
-        <div className={tile}>
-          <Stat
-            label="Rounds"
-            size="lg"
-            value={summary.count.toLocaleString("en-GB")}
-            sub={change(summary.count, previous ? previous.count : null)}
-          />
-        </div>
-        <div className={tile}>
-          <Stat
-            label="Median round"
-            size="lg"
-            value={money(summary.medianGbpMinor)}
-            sub={change(
-              summary.medianGbpMinor,
-              previous ? previous.medianGbpMinor : null,
-            )}
-          />
-        </div>
+    <div className="grid grid-cols-3 items-stretch gap-2 sm:gap-3">
+      <div className={tile}>
+        <Stat
+          label="Raised, in GBP"
+          size="lg"
+          value={money(total)}
+          sub={change(
+            summary.totalGbpMinor,
+            previous ? previous.totalGbpMinor : null,
+          )}
+        />
       </div>
-      {previous && previousLabel ? (
-        <p className="mt-2 text-xs text-muted">
-          Changes compare with {previousLabel}, the window of the same length
-          before.
-        </p>
-      ) : null}
+      <div className={tile}>
+        <Stat
+          label="Rounds"
+          size="lg"
+          value={summary.count.toLocaleString("en-GB")}
+          sub={change(summary.count, previous ? previous.count : null)}
+        />
+      </div>
+      <div className={tile}>
+        <Stat
+          label="Median round"
+          size="lg"
+          value={money(summary.medianGbpMinor)}
+          sub={change(
+            summary.medianGbpMinor,
+            previous ? previous.medianGbpMinor : null,
+          )}
+        />
+      </div>
     </div>
   );
 }

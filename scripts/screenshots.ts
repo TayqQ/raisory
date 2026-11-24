@@ -63,7 +63,7 @@ function companyShots(slug: string, name: string): Shot[] {
  * The home page (task 079) in List and Cards, light and dark, at 375 and
  * 1280 px. `?view=` picks the view, so no cookie is needed. Phones always show
  * the stacked list; the 375 Cards shot checks that. The 375 shots are full
- * page, to show the summary, the quick views and the row stacks.
+ * page, to show the summary panel and the row stacks.
  */
 function homeShots(): Shot[] {
   const shots: Shot[] = [];
@@ -90,20 +90,6 @@ function homeShots(): Shot[] {
     }
   }
   return shots;
-}
-
-/**
- * The Split view (task 080) at 1280 px, light and dark: compact rows on the
- * left and the first row's company preview on the right.
- */
-function splitShots(): Shot[] {
-  return (["light", "dark"] as const).map((theme) => ({
-    path: "/?view=split",
-    file: `home-split-1280-${theme}.png`,
-    width: 1280,
-    height: 800,
-    theme,
-  }));
 }
 
 /**
@@ -215,7 +201,6 @@ function readmeShots(): Shot[] {
 const SHOTS: Shot[] = [
   ...readmeShots(),
   ...homeShots(),
-  ...splitShots(),
   ...otherPageShots(),
   ...shellShots(),
   ...companyShots(company, "company-confirmed"),

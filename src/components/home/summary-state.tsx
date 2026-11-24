@@ -106,53 +106,56 @@ export function SummaryFrame({ children }: { children: ReactNode }) {
   return <div hidden={!visible}>{children}</div>;
 }
 
-/** The summary header's right side: "Keep hidden by default" and close. */
-export function SummaryControls() {
-  const { hiddenByDefault, close, setHiddenByDefault } =
-    useContext(SummaryContext);
-  const checkboxId = useId();
+/** The panel's close button, in its header: "Hide summary", in words. */
+export function HideSummaryButton() {
+  const { close } = useContext(SummaryContext);
   return (
-    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-      <label
-        htmlFor={checkboxId}
-        className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted hover:text-ink"
+    <button
+      id={CLOSE_ID}
+      type="button"
+      onClick={close}
+      className={`${buttonClasses("ghost", "sm")} shrink-0 gap-1.5 px-2 text-muted hover:text-ink`}
+    >
+      <svg
+        className="shrink-0"
+        viewBox="0 0 16 16"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        aria-hidden="true"
       >
-        <input
-          id={checkboxId}
-          type="checkbox"
-          checked={hiddenByDefault}
-          onChange={(event) => setHiddenByDefault(event.currentTarget.checked)}
-          className="size-3.5 accent-[var(--brand)]"
-        />
-        Keep hidden <span className="max-sm:sr-only">by default</span>
-      </label>
-      <button
-        id={CLOSE_ID}
-        type="button"
-        aria-label="Hide summary"
-        title="Hide summary"
-        onClick={close}
-        className={`${buttonClasses("ghost", "sm")} w-8 !px-0 text-muted hover:text-ink`}
-      >
-        <svg
-          className="shrink-0"
-          viewBox="0 0 16 16"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          aria-hidden="true"
-        >
-          <path d="M4 4l8 8M12 4l-8 8" />
-        </svg>
-      </button>
-    </div>
+        <path d="M4 4l8 8M12 4l-8 8" />
+      </svg>
+      Hide summary
+    </button>
   );
 }
 
-/** "Show summary", at the right of the funding toolbar while it is hidden. */
+/** "Keep hidden by default", in the panel's footer. */
+export function KeepHiddenToggle() {
+  const { hiddenByDefault, setHiddenByDefault } = useContext(SummaryContext);
+  const checkboxId = useId();
+  return (
+    <label
+      htmlFor={checkboxId}
+      className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-muted hover:text-ink"
+    >
+      <input
+        id={checkboxId}
+        type="checkbox"
+        checked={hiddenByDefault}
+        onChange={(event) => setHiddenByDefault(event.currentTarget.checked)}
+        className="size-3.5 accent-[var(--brand)]"
+      />
+      Keep hidden by default
+    </label>
+  );
+}
+
+/** "Show summary", next to Sort and the view switch while it is hidden. */
 export function ShowSummaryButton() {
   const { visible, show } = useContext(SummaryContext);
   if (visible) return null;
@@ -160,11 +163,11 @@ export function ShowSummaryButton() {
     <button
       id={SHOW_ID}
       type="button"
-      aria-label="Show summary"
       onClick={show}
-      className={`${buttonClasses("ghost", "sm")} shrink-0 gap-1.5 px-2 text-muted hover:text-ink`}
+      className={`${buttonClasses("secondary", "sm")} shrink-0 gap-1.5 px-2.5`}
     >
       <svg
+        className="shrink-0 text-muted"
         viewBox="0 0 16 16"
         width="16"
         height="16"
@@ -177,9 +180,7 @@ export function ShowSummaryButton() {
       >
         <path d="M3 13.5V9M8 13.5V3M13 13.5V6.5M1.5 13.5h13" />
       </svg>
-      <span>
-        <span className="max-sm:sr-only">Show</span> summary
-      </span>
+      Show summary
     </button>
   );
 }

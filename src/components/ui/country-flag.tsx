@@ -25,9 +25,9 @@ export function countryNameFor(code: string): string {
 
 const SIZES = {
   /** Rows, cards and chips. */
-  sm: { width: 16, height: 12, box: "h-[12px] w-[16px]" },
+  sm: { width: 20, height: 15, box: "h-[15px] w-[20px]" },
   /** The company header. */
-  lg: { width: 20, height: 15, box: "h-[15px] w-[20px]" },
+  lg: { width: 24, height: 18, box: "h-[18px] w-[24px]" },
 } as const;
 
 export function CountryFlag({

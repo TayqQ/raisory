@@ -24,7 +24,7 @@
   --brand-soft: #E1E9FC;    /* selected rows, active chips */
   --on-brand: #FFFFFF;
 
-  /* Accent: orange for what must be noticed (primary action, "New", the active quick view) */
+  /* Accent: orange for what must be noticed (primary action, "New") */
   --accent: #E95D10;
   --accent-hover: #F27632;
   --accent-soft: #FFE7D7;

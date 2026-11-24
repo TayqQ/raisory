@@ -40,7 +40,7 @@ Chosen 17 November 2026: direction 2, "Ledger". The drafts of all three directio
 | Ink | #0E1C3B | #E8EDF6 | Text |
 | Muted | #465474 | #9DAAC2 | Secondary text |
 | Navy (brand) | #1D49A9 | #82A8FF | Identity, links, selection, the logo ring. Between v2 options Harbour (#1E3F80) and Signal (#1B5BF5), closer to Harbour |
-| Orange (accent) | #E95D10 | #FF7A30 | What must be noticed: the primary action, "New", the active quick view, the logo dot. Orange buttons use ink text (white fails). Orange text uses `--accent-ink` (#B0430A) |
+| Orange (accent) | #E95D10 | #FF7A30 | What must be noticed: the primary action, "New", the logo dot. Orange buttons use ink text (white fails). Orange text uses `--accent-ink` (#B0430A) |
 | Up / down / warn / info | #0B7A4B · #B5302A · #806200 · #1F65AD | #4FD08F · #FF8A7D · #F0CF4A · #6FB6F2 | Always with an icon or word. Warn is yellow-amber, kept clear of the orange |
 
 **Contrast and emphasis:** the UI stays mostly calm (paper, white panels, ink). Navy marks where you are and what's selected; orange marks what to act on or notice. Use at most one orange button per view.

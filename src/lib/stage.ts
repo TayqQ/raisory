@@ -20,11 +20,25 @@ export function stageBucket(roundType: RoundType): StageBucket {
   return BUCKETS[roundType];
 }
 
-/** Tailwind background class for a bucket (the stage ramp in globals.css). */
-export const STAGE_BG: Readonly<Record<StageBucket, string>> = {
-  early: "bg-stage-early",
-  seed: "bg-stage-seed",
-  venture: "bg-stage-venture",
-  late: "bg-stage-late",
-  other: "bg-stage-other",
+/** The buckets, early to late, then other. */
+export const STAGE_BUCKETS: readonly StageBucket[] = [
+  "early",
+  "seed",
+  "venture",
+  "late",
+  "other",
+];
+
+/**
+ * Tailwind classes for a bucket's label: the soft stage fill with the
+ * stage-coloured text on it (`--stage-*-soft` and `--stage-*-ink` in
+ * globals.css, at least 4.5:1 in both themes). Written out in full so
+ * Tailwind finds them.
+ */
+export const STAGE_LABEL_CLASSES: Readonly<Record<StageBucket, string>> = {
+  early: "bg-stage-early-soft text-stage-early-ink",
+  seed: "bg-stage-seed-soft text-stage-seed-ink",
+  venture: "bg-stage-venture-soft text-stage-venture-ink",
+  late: "bg-stage-late-soft text-stage-late-ink",
+  other: "bg-stage-other-soft text-stage-other-ink",
 };

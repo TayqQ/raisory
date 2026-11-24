@@ -343,64 +343,6 @@ export interface CompanyDetail {
   registry?: CompanyRegistryView | null;
 }
 
-/** The light company view for the split preview (docs/design/design-system.md section 5). */
-export interface CompanyPreview {
-  slug: string;
-  name: string;
-  description: string | null;
-  websiteDomain: string | null;
-  countryCode: string | null;
-  city: string | null;
-  mainSector: Sector | null;
-  foundedYear: number | null;
-  foundedYearSource: FoundedYearSource | null;
-  status: CompanyStatus;
-  /** Equity rounds in the 24 months to today. */
-  roundsInLast24Months: number;
-  /** Slug of the surviving company when this one was merged. */
-  redirectToSlug: string | null;
-  /** Null when the company has no funding round. */
-  latestRound: CompanyPreviewRound | null;
-  /** Null when the company has no linked Companies House record. */
-  registry: CompanyPreviewRegistry | null;
-  /** The facts the signals are worked out from. */
-  signals: CompanyPreviewSignals;
-}
-
-export interface CompanyPreviewRound {
-  eventId: number;
-  roundType: RoundType;
-  roundLabel: string | null;
-  amount: Money | null;
-  amountGbpMinor: number | null;
-  announcedOn: string;
-  leadInvestors: InvestorRef[];
-  investorCount: number;
-  sourceCount: number;
-  evidence: EvidenceLevel;
-  confirmation: EventConfirmation | null;
-}
-
-export interface CompanyPreviewRegistry {
-  companyNumber: string;
-  url: string;
-  statusLabel: string;
-  sizeBand: CompanySizeBand;
-  /** YYYY-MM-DD. */
-  incorporatedOn: string;
-}
-
-export interface CompanyPreviewSignals {
-  /** The latest round is confirmed by an official record. */
-  confirmed: boolean;
-  /** Whole days from the latest round to today. Null when there is no round. */
-  daysSinceLastRound: number | null;
-  /** YYYY-MM-DD of the earliest recorded funding round. */
-  firstRoundOn: string | null;
-  /** Sources behind the latest round. */
-  sourceCount: number;
-}
-
 export interface InvestorRoundRow extends FundingRow {
   role: InvestorRole;
 }

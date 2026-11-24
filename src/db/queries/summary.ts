@@ -1,12 +1,12 @@
 import { and, eq, isNotNull, sql, type SQL } from "drizzle-orm";
 import type {
-  FundingCriteria,
   FundingFilters,
   FundingSummary,
   FundingTotals,
   SectorTotal,
 } from "@/core/read-models";
 import { SECTORS, SECTOR_LABELS, type Sector } from "@/core/sectors";
+import type { SummaryPeriod } from "@/lib/view-preference";
 import type { Db } from "../client";
 import { companies, events, fundingRounds } from "../schema";
 import {
@@ -51,6 +51,91 @@ export function previousWindow(
   if (!Number.isFinite(length) || length < 1) return null;
   return { from: isoDay(start - length), to: isoDay(start - 1) };
 }
+
+/** A closed range of days, YYYY-MM-DD at both ends. */
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+const PERIOD_DAYS: Readonly<Record<Exclude<SummaryPeriod, "12m">, number>> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
+
+/**
+ * The days a summary period covers, up to and including `today`. "Last 30
+ * days" starts 30 days back, like the list's date presets; "Last 12 months"
+ * starts on the same date a year back.
+ */
+export function summaryPeriodRange(
+  period: SummaryPeriod,
+  today: string,
+): DateRange {
+  const start = new Date(`${today}T00:00:00Z`);
+  if (period === "12m") start.setUTCFullYear(start.getUTCFullYear() - 1);
+  else start.setUTCDate(start.getUTCDate() - PERIOD_DAYS[period]);
+  return { from: start.toISOString().slice(0, 10), to: today };
+}
+
+/**
+ * The days the summary covers: the period, cut to the list's own dates when
+ * the list has any (the overlap of the two). Null when they do not overlap.
+ */
+export function summaryRange(
+  period: DateRange,
+  filters: Pick<FundingFilters, "from" | "to">,
+): DateRange | null {
+  const from =
+    filters.from && DATE.test(filters.from) && filters.from > period.from
+      ? filters.from
+      : period.from;
+  const to =
+    filters.to && DATE.test(filters.to) && filters.to < period.to
+      ? filters.to
+      : period.to;
+  return from <= to ? { from, to } : null;
+}
+
+/** What the summary covers, worked out from the period and the list's dates. */
+export interface SummaryScope {
+  period: SummaryPeriod;
+  /** Every day of the period, to today. */
+  periodRange: DateRange;
+  /**
+   * The days summarised: the period, cut to the list's dates when it has
+   * any. Null when the two do not overlap.
+   */
+  range: DateRange | null;
+  /** The days of the same length just before `range`, for the comparison. */
+  previous: DateRange | null;
+}
+
+export function summaryScope(
+  period: SummaryPeriod,
+  filters: Pick<FundingFilters, "from" | "to">,
+  today: string,
+): SummaryScope {
+  const periodRange = summaryPeriodRange(period, today);
+  const range = summaryRange(periodRange, filters);
+  return {
+    period,
+    periodRange,
+    range,
+    previous: range ? previousWindow(range, today) : null,
+  };
+}
+
+/** A summary with nothing in it, for a range with no days. */
+export const EMPTY_FUNDING_SUMMARY: FundingSummary = {
+  totalGbpMinor: 0,
+  count: 0,
+  medianGbpMinor: null,
+  previous: null,
+  sectors: [],
+  biggest: [],
+};
 
 function totals(
   total: unknown,
@@ -182,65 +267,6 @@ export async function getFundingSummary(
     sectors,
     biggest: await withConfirmations(db, biggestRows),
   };
-}
-
-/** A quick-view tab as plain criteria (`src/components/home/quick-views.tsx`). */
-export interface QuickViewCriteria {
-  id: string;
-  criteria: FundingCriteria;
-}
-
-/**
- * The filters with every key a quick view sets removed: the "current non-tab
- * filters" each tab's count is taken under.
- */
-export function quickViewBase(
-  filters: FundingFilters,
-  views: readonly QuickViewCriteria[],
-): FundingFilters {
-  const base: FundingFilters = { ...filters };
-  for (const view of views) {
-    for (const key of Object.keys(view.criteria)) {
-      delete base[key as keyof FundingCriteria];
-    }
-  }
-  return base;
-}
-
-/**
- * The number of rounds each quick view would list, under the current filters
- * minus the keys the views set, in one statement: the base filter is the
- * WHERE clause and each view is a `count(*) filter (where ...)` of its own
- * criteria. A view only narrows the base, so a view that selects grants alone
- * is not supported (the base hides grants unless chosen, D44).
- */
-export async function getQuickViewCounts(
-  db: Db,
-  filters: FundingFilters,
-  views: readonly QuickViewCriteria[],
-): Promise<Record<string, number>> {
-  if (views.length === 0) return {};
-  const base = quickViewBase(filters, views);
-  const where = fundingWhere(base, normalisedQuery(base.q));
-  const columns: Record<string, SQL<unknown>> = {};
-  views.forEach((view, index) => {
-    const own = fundingWhere(
-      { page: 1, pageSize: base.pageSize, ...view.criteria },
-      null,
-    );
-    columns[`v${index}`] = sql<unknown>`(count(*) filter (where ${own}))::int`;
-  });
-
-  const [row] = await db
-    .select(columns)
-    .from(events)
-    .innerJoin(companies, eq(companies.id, events.companyId))
-    .innerJoin(fundingRounds, eq(fundingRounds.eventId, events.id))
-    .where(where);
-
-  return Object.fromEntries(
-    views.map((view, index) => [view.id, asCount(row?.[`v${index}`])]),
-  );
 }
 
 /** A sector and its number of rounds, for the sector filter's order. */

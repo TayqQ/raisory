@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FundingFilters, FundingRow } from "@/core/read-models";
 import { RoundCards } from "./round-cards";
 import { RoundList } from "./round-list";
@@ -291,28 +291,6 @@ describe("RoundViews", () => {
     expect(screen.getByRole("article")).toBeInTheDocument();
   });
 
-  it("renders the list for screens under 1100 px alongside Split", () => {
-    window.history.replaceState(null, "", "/?view=split");
-    render(
-      <RoundViews
-        rows={[row(), BARE]}
-        view="split"
-        filters={filters}
-        appliedLabels={[]}
-        clearHref="/"
-        href="/?view=split"
-        previewSlug="northwind-robotics"
-        preview={null}
-        now={NOW}
-      />,
-    );
-    const table = screen.getByRole("table");
-    expect(table.closest(".min-\\[1100px\\]\\:hidden")).not.toBeNull();
-    const region = screen.getByRole("region", { name: "Company preview" });
-    expect(region.closest(".max-\\[1100px\\]\\:hidden")).not.toBeNull();
-    expect(table.closest(".max-\\[1100px\\]\\:hidden")).toBeNull();
-  });
-
   it("renders only the list in List", () => {
     render(
       <RoundViews
@@ -357,64 +335,25 @@ describe("SortControl", () => {
 });
 
 describe("ViewSwitch", () => {
-  function stubWidth(narrow: boolean) {
-    vi.stubGlobal(
-      "matchMedia",
-      (query: string) =>
-        ({
-          matches: narrow && query.includes("max-width"),
-          media: query,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList,
-    );
-  }
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("offers Split, untitled on a wide screen", () => {
-    stubWidth(false);
+  it("offers List and Cards only", () => {
     render(<ViewSwitch view="list" href="/" />);
-    const split = screen.getByRole("radio", { name: "Split" });
-    expect(split).toBeEnabled();
-    expect(split).not.toHaveAttribute("title");
+    expect(
+      screen.getAllByRole("radio").map((radio) => radio.textContent),
+    ).toEqual(["List", "Cards"]);
     expect(screen.getByRole("radio", { name: "List" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
   });
 
-  it("explains under 1100 px that Split needs a wider screen", () => {
-    stubWidth(true);
-    render(<ViewSwitch view="split" href="/?view=split" />);
-    const split = screen.getByRole("radio", { name: "Split" });
-    expect(split).toBeEnabled();
-    expect(split).toHaveAttribute("title", "Needs a wider screen");
-  });
-
-  it("chooses Split like any other view", () => {
-    stubWidth(false);
-    window.history.replaceState(null, "", "/");
-    render(<ViewSwitch view="list" href="/" />);
-    act(() => {
-      fireEvent.click(screen.getByRole("radio", { name: "Split" }));
-    });
-    expect(document.cookie).toContain("raisory_view=split");
-    // Split is the default, so its URL stays plain.
-    expect(replace).toHaveBeenCalledWith("/", { scroll: false });
-  });
-
-  it("puts List in the URL, since Split is the default", () => {
-    stubWidth(false);
-    window.history.replaceState(null, "", "/");
-    render(<ViewSwitch view="split" href="/" />);
+  it("keeps the URL plain for List, the default", () => {
+    window.history.replaceState(null, "", "/?view=cards");
+    render(<ViewSwitch view="cards" href="/?view=cards" />);
     act(() => {
       fireEvent.click(screen.getByRole("radio", { name: "List" }));
     });
     expect(document.cookie).toContain("raisory_view=list");
-    expect(replace).toHaveBeenCalledWith("/?view=list", { scroll: false });
+    expect(replace).toHaveBeenCalledWith("/", { scroll: false });
   });
 
   it("remembers the choice in the cookie and puts it in the URL", () => {

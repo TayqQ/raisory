@@ -289,10 +289,10 @@ export default function UiGalleryPage() {
                 { value: "list", label: "List" },
                 { value: "cards", label: "Cards" },
                 {
-                  value: "split",
-                  label: "Split",
+                  value: "wide",
+                  label: "Wide",
                   disabled: true,
-                  title: "Split needs a screen at least 1100 px wide",
+                  title: "Needs a wider screen",
                 },
               ]}
             />

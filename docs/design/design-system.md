@@ -2,30 +2,29 @@
 
 Agreed with Taylor on 18 November 2026, after reviewing the three directions in `directions/`. The brand lives in `brand/`; this file covers how the product is put together. It becomes decision D66 when it merges.
 
-## 1. Decision: one site, three list views
+## 1. Decision: one site, two list views
 - **One home page structure, one company page, one phone layout.** Nothing switches per "user type".
-- **The list of rounds has three views**, chosen by the visitor with a visible switch next to Sort:
+- **The list of rounds has two views**, chosen by the visitor with a visible switch next to Sort:
 
   | View | Comes from | For |
   |---|---|---|
   | **List** (default) | A, Terminal | Scanning many rounds |
   | **Cards** | B, Briefing | Browsing and reading descriptions |
-  | **Split** (list plus preview) | C, Prospector | Working through leads without leaving the page |
 
-- **The choice is remembered** in the cookie `raisory_view` (`list` / `cards` / `split`, one year, `SameSite=Lax`), which the server reads so the first paint is right. `?view=` overrides it for one visit, which makes view-specific links shareable. There is no settings page.
-- **Phones (under 768 px) always show the stacked list.** The switch is hidden there. Split needs at least 1100 px; below that, a split choice falls back to List, and the switch shows Split as unavailable with a title explaining why.
+  A third view, Split (a list plus a company preview), was built in task 080 and removed in task 091 (section 9). An old `?view=split` link or `split` cookie shows List.
+- **The choice is remembered** in the cookie `raisory_view` (`list` / `cards`, one year, `SameSite=Lax`), which the server reads so the first paint is right. `?view=` overrides it for one visit, which makes view-specific links shareable. There is no settings page.
+- **Phones (under 768 px) always show the stacked list.** The switch is hidden there.
 - **Views share data and parts.** Every view renders the same `FundingRow[]` from the same query, using the same primitives (section 4). A view is only an arrangement. If one view needs a field, all views get it from the same query.
 - **Not done, on purpose:** separate home pages, navigation or company pages per audience. That would triple the work for every feature, and shared links would look different to different people.
 
 ## 2. Page templates
 ### Home (`/`)
-1. **"What's happening" summary** (from B), collapsible, with the state remembered in the cookie `raisory_summary=closed`.
-   - A headline: £ raised, the number of rounds and the median, for the current window, against the previous window of the same length.
+1. **"What's happening" summary** (from B), a panel you can close, with the state remembered in the cookie `raisory_summary` (section 9).
+   - A headline: £ raised, the number of rounds and the median, for a recent period, against the period of the same length before.
    - Sectors ranked by £. Each bar has a text value, and a click filters the list.
    - The three biggest rounds.
-   - It describes the same window as the list's date filter (90 days by default) and says so.
-2. **Quick views** (from C): tabs that set filters, each with a count: All, UK, Confirmed, Seed and Series A, £10m+. A tab only writes normal filter parameters; it is not a separate concept.
-3. **The filter bar** (research section 2):
+   - Its header picks the period (last 7 days, 30 days, 90 days or 12 months; 30 by default) and always states it.
+2. **The filter bar** (research section 2):
    - search with the `/` shortcut;
    - the sector chip row, with themes as a second level once one sector is chosen;
    - a Stage segmented control;
@@ -36,7 +35,7 @@ Agreed with Taylor on 18 November 2026, after reviewing the three directions in 
    - "More filters" (company size, momentum, investor, custom ranges).
 
    Below it, removable chips for every applied value plus "Clear all". It stays a GET form, so URLs and no-JavaScript keep working; with JavaScript it applies on change.
-4. **The list**, in the chosen view, with Sort, the view switch and paging.
+3. **The list**, in the chosen view, with Sort, the view switch, "Show summary" while the summary is hidden, and paging.
 
 ### Company (`/companies/[slug]`): one page combining the best of A, B and C
 1. **Header** (B): monogram, name, description as a standfirst, place badge, sector and theme chips.
@@ -75,7 +74,7 @@ These keep their structure. They move onto the new primitives and tokens in one 
 - **Radius:** 6 for controls and chips, 10 for cards and panels, 14 for sheets and large tiles, pill for chips that are filters.
 - **Depth:** flat by default with hairline `line` borders. `shadow-1` only for sticky headers; `shadow-2` only for popovers, sheets and menus.
 - **Motion:** 120 ms for hover and press, 200 ms for sheets and popovers, `ease-out`. No motion when `prefers-reduced-motion` is set.
-- **Breakpoints:** `sm` 640, `md` 768 (phone to tablet; the list stops stacking), `lg` 1100 (split view allowed), `xl` 1280.
+- **Breakpoints:** `sm` 640, `md` 768 (phone to tablet; the list stops stacking), `lg` 1100, `xl` 1280.
 
 ## 4. Components (`src/components/ui/`)
 Each component is small and has no data access: it takes values, renders them, and has a unit test. Pages and views compose them.
@@ -84,9 +83,9 @@ Each component is small and has no data access: it takes values, renders them, a
 |---|---|---|
 | `Monogram` | 1-2 letters on a tint picked from the name | Sizes 24, 28, 40, 56. `aria-hidden` (the name is always next to it) |
 | `Amount` | GBP first, original currency small beneath when it differs | "Undisclosed" in muted text when null. Sizes `sm` (list) and `lg` (company) |
-| `StageChip` | Stage text plus a small stage-ramp marker | Never colour alone. Normalised label (`Series F` shows "Series F" but uses the late-stage colour) |
+| `StageChip` | Stage text on a filled label in the stage's soft colour | Never colour alone. Text on every fill is at least 4.5:1 in both themes (`src/lib/stage.test.ts`). Normalised label (`Series F` shows "Series F" but uses the late-stage colour) |
 | `ConfirmedMark` | Tick icon plus "Confirmed" | Its title is the confirmation text. It replaces the current `confirmed-marker` look and keeps its tests |
-| `PlaceBadge` | Country flag (`CountryFlag`, a static SVG from `public/flags`, 16 × 12 px, 20 × 15 px in the company header) plus city | The flag's alt text is the country name; a code with no file shows as text; "Place not known" in muted text |
+| `PlaceBadge` | Country flag (`CountryFlag`, a static SVG from `public/flags`, 20 × 15 px, 24 × 18 px in the company header) plus city, or the country's name when the city is not known | The flag's alt text is the country name; next to the name the flag is decorative; a code with no file shows as text; "Place not known" in muted text |
 | `SectorLabel` | The main sector | "Sector pending" in muted text when null |
 | `RelativeDate` | "Yesterday", "4 days ago", then a date after 14 days | Exact date in `title` and `<time dateTime>` |
 | `NewMark` | A brass dot plus "New" | Rounds announced within 2 days |
@@ -101,7 +100,6 @@ Each component is small and has no data access: it takes values, renders them, a
 Views (`src/components/rounds/`):
 - `RoundList` (table rows on desktop, stacked on phones);
 - `RoundCards`;
-- `RoundSplit`, with `RoundPreview`;
 - `ViewSwitch`.
 
 All of them take `rows: FundingRow[]` plus selection state, nothing else.
@@ -114,19 +112,16 @@ A new query, `getFundingSummary(filters)`, returns:
 - sectors ranked by GBP and count;
 - the three biggest rounds.
 
-It is computed in SQL from the same filtered set as the list.
-
-The split preview needs `getCompanyPreview(slug)`: header facts, key facts, latest round, signals inputs and the registry summary. It must be cached like the company page.
+It is computed in SQL from the same filtered set as the list, with the summary's own dates (section 9).
 
 ## 6. Accessibility and quality bar
 - Text contrast at least 4.5:1, chart and UI marks at least 3:1, in both themes. The contrast test from 074 extends to every new token pair a component uses.
 - **Keyboard:**
   - `/` focuses search;
-  - in List and Split, j/k or the arrow keys move between rows;
+  - in List, j/k or the arrow keys move between rows;
   - Enter opens the selected row;
   - Escape closes sheets and popovers;
   - focus is always visible.
-- **Split view:** the list is a `listbox`-like set of links with `aria-current` on the selected row, and the preview is a labelled region. The selection lives in the URL (`?open=<slug>`), so Back and shared links restore it.
 - **The definition of done for every page task:**
   - `pnpm check` and `pnpm build` pass;
   - screenshots at 375 and 1280 px in light and dark (`pnpm screenshots`, extended per task);
@@ -140,10 +135,10 @@ The split preview needs `getCompanyPreview(slug)`: header facts, key facts, late
 | 1 | 075 primitives and semantic tokens; 076 row fields and summary queries | Yes (different files) |
 | 2 | 077 company page; 078 filter bar | Yes |
 | 3 | 079 home summary, quick views, List and Cards, view switch | After 076 and 078 |
-| 4 | 080 Split view | After 079 |
+| 4 | 080 Split view (removed in 091) | After 079 |
 | 5 | 081 sweep the other pages onto the system, then delete the old remapped names | After 075, best after 079 |
 
-Split ships last on purpose. If Cards turns out to be little used (measured with privacy-friendly page analytics, not per-person tracking), it can be dropped cheaply, because it is only an arrangement.
+Split shipped last on purpose: a view is only an arrangement, so it can be dropped cheaply. Task 091 dropped it.
 
 ## 8. v2: the app shell and the Harbour+ palette (19 November 2026)
 After seeing v1 live, Taylor asked for three changes. This section overrides anything above that conflicts with it.
@@ -159,9 +154,21 @@ After seeing v1 live, Taylor asked for three changes. This section overrides any
      At 1024-1279 px it collapses to a 64 px icon rail, with tooltips and the same order. Under 768 px it becomes a bottom tab bar with Funding, Companies, Investors, Trends and More (More opens a sheet with the rest).
    - **Top bar,** across the content area: global search (`/` and ⌘K focus it; it searches companies and investors and lands on the funding list with `q`), then on the right the primary orange action (a placeholder link).
    - **Content area:** no `max-width` container. Panels and lists fill the width, with sensible minimums. Long prose (About) keeps a readable measure inside its panel.
-   - **Split view** becomes the natural desktop default once there is room (at least 1280 px of content); List remains the default below that. The visitor's choice still wins.
+   - **List** is the default view at every width (Split, once the desktop default, was removed in task 091). The visitor's choice still wins.
 3. **No page title and description blocks.** Remove the large H1 and standfirst at the top of every page ("Who just raised, how much, and from whom" and the others):
    - The sidebar's active item says where you are. Each page still has one H1 for accessibility, either visually hidden or the entity's own name on detail pages (the company, investor or theme name stays visible as the page header).
    - Context such as "From the 16 most recent rounds" lives in small captions beside the data it describes.
 
 The prototype is `brand/palette-v2.html` (palette D, "Home" and "Company" pages). Tasks: 082 (tokens and logo), 083 (app shell), 084 (remove page headers, full-width pages).
+
+## 9. Funding page refinements (24 November 2026)
+After reviewing the live site, Taylor asked for a simpler funding page (task 091). This section overrides anything above that conflicts with it.
+
+1. **Two views.** Split and its company preview are gone, with the `/api/company-preview` route and its query. List and Cards stay, and List keeps j/k.
+2. **No quick-view tabs.** The tabs above the list were filters in another form, so they are gone with their counts. "Show summary" sits next to Sort and the view switch while the summary is hidden.
+3. **Filled stage labels.** The whole label takes its stage's soft fill (`--stage-*-soft`) with stage-coloured text (`--stage-*-ink`), at least 4.5:1 in light and dark. The solid stage ramp stays for bars and other marks.
+4. **Place.** Flags are 20 px wide in rows and cards and 24 px in the company header. With no town, the country's name sits next to the flag.
+5. **The summary is a panel.** A bordered card with a header (title, period, close button "Hide summary") and a footer (what the changes compare with, "Keep hidden by default"). Open or hidden is still kept in `raisory_summary`.
+6. **The summary covers a recent period:** last 7 days, 30 days (the default), 90 days or 12 months. The header's control is a row of links to `?summary=7d|30d|90d|12m`, so it works without JavaScript and can be shared. With JavaScript the choice is also kept for the browser session in `raisory_summary_period`, because filter, sort and page links do not carry `?summary=`. The comparison is the period of the same length just before (`previousWindow`).
+7. **In step with the list.** The summary uses the list's other filters. When the list has its own dates, the summary covers their overlap with the period and says so in a short line; when they do not overlap, it says there is nothing to summarise.
+

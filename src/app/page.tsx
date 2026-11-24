@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { FilterBar, SECTOR_RANK_DAYS } from "@/components/filters/filter-bar";
 import { FundingSummary } from "@/components/home/funding-summary";
-import { QUICK_VIEWS, QuickViews } from "@/components/home/quick-views";
 import {
   ShowSummaryButton,
   SummaryFrame,
@@ -15,16 +14,10 @@ import {
   countUnlocatedCompanies,
   listFundingRounds,
 } from "@/db/queries/funding";
-import { quickViewBase } from "@/db/queries/summary";
+import { EMPTY_FUNDING_SUMMARY, summaryScope } from "@/db/queries/summary";
 import { listThemes } from "@/db/queries/themes";
 import { getWebDb } from "@/db/web";
-import {
-  cached,
-  cachedCompanyPreview,
-  cachedFundingSummary,
-  cachedQuickViewCounts,
-  cachedSectorCounts,
-} from "@/lib/cached";
+import { cached, cachedFundingSummary, cachedSectorCounts } from "@/lib/cached";
 import { describeFundingCriteria } from "@/lib/filter-summary";
 import {
   describeAppliedFilters,
@@ -35,15 +28,19 @@ import {
   unresolvedNearName,
 } from "@/lib/funding-filters";
 import {
-  OPEN_PARAM,
   SUMMARY_COOKIE,
+  SUMMARY_PARAM,
+  SUMMARY_PERIODS,
+  SUMMARY_PERIOD_COOKIE,
   VIEW_COOKIE,
   VIEW_PARAM,
-  parseOpenSlug,
+  parseSummaryPeriod,
   parseSummaryState,
   resolveListView,
-  resolveOpenSlug,
+  resolveSummaryPeriod,
+  withSummaryParam,
   withViewParam,
+  type SummaryPeriod,
 } from "@/lib/view-preference";
 
 export const dynamic = "force-dynamic";
@@ -69,18 +66,29 @@ export default async function HomePage({
   const summaryState = parseSummaryState(
     cookieStore.get(SUMMARY_COOKIE)?.value,
   );
+  // The summary covers a recent period (`?summary=`, else the period chosen
+  // this session, else 30 days), cut to the list's own dates when it has any.
+  const period = resolveSummaryPeriod({
+    param: params[SUMMARY_PARAM],
+    cookie: cookieStore.get(SUMMARY_PERIOD_COOKIE)?.value,
+  });
+  const scope = summaryScope(period, filters, today);
   // Sort and paging do not change the summary, so they stay out of its key.
-  const summaryFilters = {
-    ...filters,
-    sort: undefined,
-    direction: undefined,
-    page: 1,
-    pageSize: SUMMARY_PAGE_SIZE,
-  };
+  const summaryFilters = scope.range
+    ? {
+        ...filters,
+        from: scope.range.from,
+        to: scope.range.to,
+        sort: undefined,
+        direction: undefined,
+        page: 1,
+        pageSize: SUMMARY_PAGE_SIZE,
+      }
+    : null;
 
   // The summary is rendered even when hidden, so "Show summary" opens it at
   // once without another request.
-  const [page, themes, unlocated, summaryData, quickCounts, sectorCounts] =
+  const [page, themes, unlocated, summaryData, sectorCounts] =
     await Promise.all([
       cached(() => listFundingRounds(getWebDb(), filters), ["funding", key]),
       cached(() => listThemes(getWebDb()), ["themes", "active"]),
@@ -90,24 +98,11 @@ export default async function HomePage({
             ["funding-unlocated", key],
           )
         : Promise.resolve(0),
-      cachedFundingSummary(summaryFilters),
-      cachedQuickViewCounts(summaryFilters, QUICK_VIEWS),
+      summaryFilters
+        ? cachedFundingSummary(summaryFilters)
+        : Promise.resolve(EMPTY_FUNDING_SUMMARY),
       cachedSectorCounts(SECTOR_RANK_DAYS),
     ]);
-
-  // Split renders the selected company's preview on the server: `?open=` when
-  // that company is on this page, else the first row. A failed read leaves it
-  // to the client, which fetches it.
-  const previewSlug =
-    view === "split"
-      ? resolveOpenSlug(
-          page.items.map((row) => row.companySlug),
-          parseOpenSlug(params[OPEN_PARAM]),
-        )
-      : null;
-  const preview = previewSlug
-    ? await cachedCompanyPreview(previewSlug).catch(() => undefined)
-    : undefined;
 
   const themeNames = Object.fromEntries(
     themes.map((theme) => [theme.slug, theme.name]),
@@ -120,7 +115,17 @@ export default async function HomePage({
     themes: themeNames,
     today,
   }).map((chip) => chip.label);
-  const currentHref = withViewParam(key ? `/?${key}` : "/", view);
+  const listHref = withViewParam(key ? `/?${key}` : "/", view);
+  // A period in the URL stays in the view switch's links.
+  const currentHref = parseSummaryPeriod(params[SUMMARY_PARAM])
+    ? withSummaryParam(listHref, period)
+    : listHref;
+  const periodHrefs = Object.fromEntries(
+    SUMMARY_PERIODS.map((option) => [
+      option,
+      withSummaryParam(listHref, option),
+    ]),
+  ) as Record<SummaryPeriod, string>;
 
   return (
     <main>
@@ -132,7 +137,8 @@ export default async function HomePage({
             <FundingSummary
               summary={summaryData}
               filters={filters}
-              today={today}
+              scope={scope}
+              periodHrefs={periodHrefs}
             />
           </SummaryFrame>
 
@@ -140,25 +146,13 @@ export default async function HomePage({
             <h2 id="rounds-heading" className="sr-only">
               Funding rounds
             </h2>
-            <div className="flex items-center gap-2 border-b border-line">
-              <div className="min-w-0 flex-1">
-                <QuickViews
-                  filters={filters}
-                  base={quickViewBase(filters, QUICK_VIEWS)}
-                  counts={quickCounts}
-                />
-              </div>
-              <ShowSummaryButton />
-            </div>
-            <div className="mt-4">
-              <FilterBar
-                filters={filters}
-                themes={themes}
-                total={page.total}
-                sectorCounts={sectorCounts}
-                today={today}
-              />
-            </div>
+            <FilterBar
+              filters={filters}
+              themes={themes}
+              total={page.total}
+              sectorCounts={sectorCounts}
+              today={today}
+            />
 
             <div className="mt-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 pb-3">
               <div className="min-w-0">
@@ -179,6 +173,7 @@ export default async function HomePage({
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <SortControl filters={filters} />
                 <ViewSwitch view={view} href={currentHref} />
+                <ShowSummaryButton />
               </div>
             </div>
 
@@ -204,9 +199,6 @@ export default async function HomePage({
               filters={filters}
               appliedLabels={appliedLabels}
               clearHref={fundingFiltersHref({}, filters)}
-              href={currentHref}
-              preview={preview}
-              previewSlug={preview === undefined ? null : previewSlug}
             />
             <Pagination
               filters={filters}

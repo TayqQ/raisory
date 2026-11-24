@@ -11,8 +11,8 @@ describe("CountryFlag", () => {
     const flag = screen.getByRole("img", { name: "United Kingdom" });
     expect(flag).toHaveAttribute("src", "/flags/gb.svg");
     expect(flag).toHaveAttribute("title", "United Kingdom");
-    expect(flag).toHaveAttribute("width", "16");
-    expect(flag).toHaveAttribute("height", "12");
+    expect(flag).toHaveAttribute("width", "20");
+    expect(flag).toHaveAttribute("height", "15");
     expect(flag).toHaveAttribute("loading", "lazy");
   });
 
@@ -26,7 +26,7 @@ describe("CountryFlag", () => {
 
   it("is larger at the large size", () => {
     render(<CountryFlag countryCode="GB" size="lg" />);
-    expect(screen.getByRole("img")).toHaveAttribute("width", "20");
+    expect(screen.getByRole("img")).toHaveAttribute("width", "24");
   });
 
   it("has empty alt text when it sits beside the country name", () => {

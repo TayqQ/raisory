@@ -98,9 +98,9 @@ export function stepIndex(from: number, step: 1 | -1, count: number): number {
 }
 
 /**
- * Hidden copies of a list (the phone list under the cards, the list under the
- * split view) stay mounted, so only a rendered list answers the keys.
- * Browsers without `checkVisibility` count every list as shown.
+ * A hidden copy of a list (the phone list under the cards) stays mounted, so
+ * only a rendered list answers the keys. Browsers without `checkVisibility`
+ * count every list as shown.
  */
 function isShown(element: HTMLElement): boolean {
   return typeof element.checkVisibility === "function"

@@ -13,11 +13,9 @@ import {
   companySectors,
   companyThemes,
   eventConfirmations,
-  eventInvestors,
   events,
   fundingRoundMomentum,
   fundingRounds,
-  investors,
   registryLinks,
   tags,
   themes,
@@ -157,11 +155,7 @@ async function linkTheme(
   await db.insert(companyThemes).values({ companyId, themeId, tagCount: 1 });
 }
 import { createTestDb, type TestDb } from "../testing";
-import {
-  getCompanyDetail,
-  getCompanyPreview,
-  getSimilarCompanies,
-} from "./companies";
+import { getCompanyDetail, getSimilarCompanies } from "./companies";
 
 describe("company detail targeting data", () => {
   let test: TestDb;
@@ -429,150 +423,6 @@ describe("company registry data", () => {
     ]);
     detail = await getCompanyDetail(db, "fake-ledger", "2026-11-11");
     expect(detail?.sectors?.sort()).toEqual(["education", "software-ai"]);
-  });
-});
-
-describe("company preview", () => {
-  let test: TestDb;
-  let db: Db;
-
-  beforeEach(async () => {
-    test = await createTestDb();
-    db = test.db;
-  });
-
-  afterEach(async () => {
-    await test.close();
-  });
-
-  it("returns the light view of a confirmed company", async () => {
-    const id = await addCompany(db, "Fake Ledger", { city: "Leeds" });
-    await db
-      .update(companies)
-      .set({ description: "Ledgers for startups", foundedYear: 2021 })
-      .where(eq(companies.id, id));
-    const fin = await addTheme(db, "fintech", { sector: "financial-services" });
-    await linkTheme(db, id, fin);
-    const [, latest] = await addRounds(db, id, [
-      { date: "2025-03-10", type: "seed", gbp: 150_000_000 },
-      {
-        date: "2026-09-05",
-        type: "series_a",
-        gbp: 800_000_000,
-        evidence: "confirmed",
-      },
-    ]);
-    if (latest == null) throw new Error("No event");
-    await db
-      .update(events)
-      .set({ sourceCount: 3 })
-      .where(eq(events.id, latest));
-    await db.insert(chCompanies).values({
-      companyNumber: "09000501",
-      name: "FAKE LEDGER LIMITED",
-      status: "active",
-      companyType: "ltd",
-      incorporatedOn: "2022-06-01",
-      sicCodes: ["62012"],
-      officePostcode: "ZZ9 9ZZ",
-      accountsType: "micro-entity",
-    });
-    await db.insert(registryLinks).values({
-      companyId: id,
-      registry: "companies_house",
-      registryId: "09000501",
-      registryName: "FAKE LEDGER LIMITED",
-      status: "linked",
-      method: "name_location",
-      reason: "test",
-      decidedBy: "auto",
-    });
-    const [investor] = await db
-      .insert(investors)
-      .values({
-        slug: "example-ventures",
-        name: "Example Ventures",
-        normalisedName: "example ventures",
-      })
-      .returning({ id: investors.id });
-    if (!investor) throw new Error("Investor insert failed");
-    await db.insert(eventInvestors).values({
-      eventId: latest,
-      investorId: investor.id,
-      role: "lead",
-    });
-    await db.insert(eventConfirmations).values({
-      eventId: latest,
-      recordKind: "ch_allotment",
-      recordId: 1,
-      rule: "test",
-      recordDate: "2026-09-04",
-      confirmsAmount: true,
-    });
-
-    const preview = await getCompanyPreview(db, "fake-ledger", "2026-11-11");
-    expect(preview).toMatchObject({
-      slug: "fake-ledger",
-      name: "Fake Ledger",
-      description: "Ledgers for startups",
-      city: "Leeds",
-      mainSector: "financial-services",
-      foundedYear: 2021,
-      roundsInLast24Months: 2,
-      redirectToSlug: null,
-      latestRound: {
-        eventId: latest,
-        roundType: "series_a",
-        amountGbpMinor: 800_000_000,
-        announcedOn: "2026-09-05",
-        leadInvestors: [{ slug: "example-ventures", name: "Example Ventures" }],
-        investorCount: 1,
-        sourceCount: 3,
-        evidence: "confirmed",
-        confirmation: { kind: "ch_allotment", recordDate: "2026-09-04" },
-      },
-      registry: {
-        companyNumber: "09000501",
-        statusLabel: "Active",
-        sizeBand: "micro",
-        incorporatedOn: "2022-06-01",
-      },
-      signals: {
-        confirmed: true,
-        daysSinceLastRound: 67,
-        firstRoundOn: "2025-03-10",
-        sourceCount: 3,
-      },
-    });
-    expect(JSON.stringify(preview)).not.toContain("ZZ9 9ZZ");
-  });
-
-  it("returns a company with no registry link or rounds", async () => {
-    await addCompany(db, "Quiet Co");
-    const preview = await getCompanyPreview(db, "quiet-co", "2026-11-11");
-    expect(preview?.registry).toBeNull();
-    expect(preview?.latestRound).toBeNull();
-    expect(preview?.mainSector).toBeNull();
-    expect(preview?.signals).toEqual({
-      confirmed: false,
-      daysSinceLastRound: null,
-      firstRoundOn: null,
-      sourceCount: 0,
-    });
-  });
-
-  it("has no registry or confirmation for a reported company", async () => {
-    const id = await addCompany(db, "Reported Co");
-    await addRounds(db, id, [{ date: "2026-10-01", type: "seed" }]);
-    const preview = await getCompanyPreview(db, "reported-co", "2026-11-11");
-    expect(preview?.registry).toBeNull();
-    expect(preview?.latestRound?.confirmation).toBeNull();
-    expect(preview?.signals.confirmed).toBe(false);
-    expect(preview?.signals.daysSinceLastRound).toBe(41);
-  });
-
-  it("returns null for an unknown slug", async () => {
-    expect(await getCompanyPreview(db, "nobody")).toBeNull();
   });
 });
 

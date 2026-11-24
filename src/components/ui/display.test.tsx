@@ -68,10 +68,13 @@ describe("StageChip", () => {
     expect(chip).toHaveAttribute("data-stage", "late");
   });
 
-  it("hides the marker from assistive technology", () => {
+  it("fills the whole label with the stage colour, with no marker", () => {
     const { container } = render(<StageChip roundType="seed" />);
-    expect(container.querySelector("[aria-hidden='true']")).not.toBeNull();
-    expect(container).toHaveTextContent("Seed");
+    const chip = screen.getByText("Seed");
+    expect(chip).toHaveAttribute("data-stage", "seed");
+    expect(chip.className).toContain("bg-stage-seed-soft");
+    expect(chip.className).toContain("text-stage-seed-ink");
+    expect(container.querySelector("[aria-hidden='true']")).toBeNull();
   });
 });
 
@@ -97,11 +100,25 @@ describe("PlaceBadge", () => {
     expect(container.textContent).toBe(",Leeds");
   });
 
-  it("shows only the flag when there is no city", () => {
-    render(<PlaceBadge countryCode="IE" city={null} />);
-    expect(screen.getByRole("img", { name: "Ireland" })).toBeInTheDocument();
-    expect(screen.queryByText("IE")).toBeNull();
+  it("names the country next to the flag when there is no city", () => {
+    const { container } = render(<PlaceBadge countryCode="ch" city={null} />);
+    expect(screen.getByText("Switzerland")).toBeInTheDocument();
+    // The name is the text, so the flag is decorative and not read twice.
+    expect(container.querySelector("img")).toHaveAttribute(
+      "src",
+      "/flags/ch.svg",
+    );
+    expect(container.querySelector("img")).toHaveAttribute("alt", "");
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByText("CH")).toBeNull();
     expect(screen.queryByText("Place not known")).toBeNull();
+    expect(container.textContent).toBe("Switzerland");
+  });
+
+  it("names a country with no flag file once, as text", () => {
+    const { container } = render(<PlaceBadge countryCode="QO" city="  " />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.textContent).toBe("Outlying Oceania");
   });
 
   it("shows only the city when there is no country", () => {
