@@ -5,6 +5,7 @@ import type { BudgetGuard, LlmClient, LlmCompleteRequest } from "@/core/ports";
 import type { Db } from "@/db/client";
 import {
   companies,
+  companyLogos,
   companyWebsites,
   eventSources,
   events,
@@ -18,6 +19,9 @@ import {
 import { createTestDb, type TestDb } from "@/db/testing";
 import type { PageSummary, WebsiteFetcher } from "./fetch-page";
 import { WEBSITE_CHECK_MODEL } from "./llm-check";
+import type { LogoFetcher, LogoFetchResult } from "./logo-fetch";
+import { removeLogo } from "./logo-store";
+import { pngBytes } from "./logo-testing";
 import { approveWebsite, rejectWebsite } from "./website-store";
 import {
   isDue,
@@ -270,6 +274,56 @@ function blocked(domain: string): PageSummary {
     detail: "HTTP 403",
     blocked: true,
   });
+}
+
+const ICON_URL = "https://brightwell.example/apple-touch-icon.png";
+
+/** A page as `ownPage`, carrying one apple-touch-icon. */
+function pageWithIcon(domain: string, siteName: string): PageSummary {
+  return {
+    ...ownPage(domain, siteName),
+    iconCandidates: [
+      { url: ICON_URL, rel: "apple-touch-icon", sizes: null, type: null },
+    ],
+  };
+}
+
+interface FakeLogoFetcher extends LogoFetcher {
+  fetched: string[];
+}
+
+/** Serves image files by URL; any other URL fails. */
+function fakeLogoFetcher(
+  files: Record<string, Uint8Array>,
+  max = 300,
+): FakeLogoFetcher {
+  let remaining = max;
+  const fetched: string[] = [];
+  return {
+    fetched,
+    remaining: () => remaining,
+    fetchLogo(url): Promise<LogoFetchResult> {
+      if (remaining <= 0) {
+        return Promise.resolve({ outcome: "cap", url, detail: "limit" });
+      }
+      remaining -= 1;
+      fetched.push(url);
+      const bytes = files[url];
+      return Promise.resolve(
+        bytes
+          ? { outcome: "fetched", url, bytes }
+          : { outcome: "failed", url, detail: "HTTP 404" },
+      );
+    },
+  };
+}
+
+function logoRow(companyId: number) {
+  return db
+    .select()
+    .from(companyLogos)
+    .where(eq(companyLogos.companyId, companyId))
+    .then((rows) => rows[0]);
 }
 
 interface FakeLlm {
@@ -788,5 +842,113 @@ describe("websitesStep", () => {
     expect(fetcher.fetched).toEqual(["brightwell.example"]);
     expect(stats.checked).toBe(1);
     expect(stats.stoppedAtFetchCap).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Logos (D72)
+
+describe("websitesStep logos", () => {
+  const pages = {
+    "brightwell.example": pageWithIcon(
+      "brightwell.example",
+      "Brightwell Robotics",
+    ),
+  };
+
+  it("stores the logo of a newly linked site", async () => {
+    const company = await addNews("Brightwell Robotics", "brightwell.example");
+    const png = pngBytes(64, 64);
+    const logos = fakeLogoFetcher({ [ICON_URL]: png });
+    const stats = await run(fakeFetcher(pages), { logoFetcher: logos });
+
+    expect(stats).toMatchObject({
+      linked: 1,
+      logosStored: 1,
+      logosNone: 0,
+      logoFetches: 1,
+      maxLogoFetches: 300,
+    });
+    expect(logos.fetched).toEqual([ICON_URL]);
+    const row = await logoRow(company.id);
+    expect(row).toMatchObject({
+      mime: "image/png",
+      width: 64,
+      height: 64,
+      sourceUrl: ICON_URL,
+      blocked: false,
+    });
+    expect(row?.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("deletes the logo when the site is demoted at the re-check", async () => {
+    const company = await addNews("Brightwell Robotics", "brightwell.example");
+    const logos = fakeLogoFetcher({ [ICON_URL]: pngBytes(64, 64) });
+    await run(fakeFetcher(pages), { logoFetcher: logos });
+    expect(await logoRow(company.id)).toBeDefined();
+
+    now = new Date(START.getTime() + (RECHECK_DAYS + 1) * DAY_MS);
+    const stats = await run(
+      fakeFetcher({
+        "brightwell.example": page("brightwell.example", {
+          title: "Domain for sale",
+          text: "This domain is for sale.",
+        }),
+      }),
+      { logoFetcher: logos },
+    );
+    expect(
+      (await rowsFor(company.id)).some((row) => row.status === "linked"),
+    ).toBe(false);
+    expect(stats.logosRemoved).toBe(1);
+    expect(await logoRow(company.id)).toBeUndefined();
+  });
+
+  it("deletes the logo when a person rejects the website", async () => {
+    const company = await addNews("Brightwell Robotics", "brightwell.example");
+    await run(fakeFetcher(pages), {
+      logoFetcher: fakeLogoFetcher({ [ICON_URL]: pngBytes(64, 64) }),
+    });
+    const [linked] = await rowsFor(company.id);
+    await rejectWebsite(db, linked!.id);
+    const stats = await run(fakeFetcher({}), {
+      logoFetcher: fakeLogoFetcher({}),
+    });
+    expect(stats.logosRemoved).toBe(1);
+    expect(await logoRow(company.id)).toBeUndefined();
+  });
+
+  it("never fetches a logo a person removed", async () => {
+    const company = await addNews("Brightwell Robotics", "brightwell.example");
+    await removeLogo(db, company.id, { apply: true });
+    const logos = fakeLogoFetcher({ [ICON_URL]: pngBytes(64, 64) });
+    const stats = await run(fakeFetcher(pages), { logoFetcher: logos });
+
+    expect(stats.linked).toBe(1);
+    expect(logos.fetched).toEqual([]);
+    expect(stats.logosStored).toBe(0);
+    expect(await logoRow(company.id)).toMatchObject({
+      blocked: true,
+      bytes: null,
+    });
+  });
+
+  it("stores no logo for an icon the probe refuses", async () => {
+    const company = await addNews("Brightwell Robotics", "brightwell.example");
+    const stats = await run(fakeFetcher(pages), {
+      logoFetcher: fakeLogoFetcher({
+        [ICON_URL]: new TextEncoder().encode("<svg></svg>"),
+      }),
+    });
+    expect(stats).toMatchObject({ linked: 1, logosStored: 0, logosNone: 1 });
+    expect(await logoRow(company.id)).toBeUndefined();
+  });
+
+  it("stops asking for logos at the logo request limit, and still links", async () => {
+    await addNews("Brightwell Robotics", "brightwell.example");
+    const logos = fakeLogoFetcher({ [ICON_URL]: pngBytes(64, 64) }, 0);
+    const stats = await run(fakeFetcher(pages), { logoFetcher: logos });
+    expect(stats).toMatchObject({ linked: 1, logosStored: 0, logoFetches: 0 });
+    expect(logos.fetched).toEqual([]);
   });
 });

@@ -14,6 +14,7 @@ import {
   previewRename,
   renameEntity,
 } from "@/pipeline/resolve/rename-entities";
+import { removeLogo } from "@/pipeline/websites/logo-store";
 import { loadDotEnv } from "./env";
 
 const USAGE = `Usage: pnpm entities <command>
@@ -25,7 +26,10 @@ const USAGE = `Usage: pnpm entities <command>
   alias --type <t> --id <id> --alias "..."          Add an alias
   rename --type <t> --id <id> --name "..." [--note "..."] [--yes]
                                                     Rename, with a new slug. Without --yes,
-                                                    shows what would change`;
+                                                    shows what would change
+  remove-logo --id <company id> [--yes]             Delete a company's logo and never fetch
+                                                    it again. Without --yes, shows what
+                                                    would change`;
 
 function entityType(value: string | undefined): MergeEntity | undefined {
   if (value === undefined) return undefined;
@@ -122,6 +126,14 @@ async function main(): Promise<number> {
           );
         }
         return 0;
+      }
+      case "remove-logo": {
+        const id = requireId(values.id, "remove-logo");
+        const result = await removeLogo(db, id, { apply: values.yes });
+        console.log(
+          JSON.stringify({ ...result, applied: values.yes && result.ok }),
+        );
+        return result.ok ? 0 : 1;
       }
       default:
         console.error(USAGE);

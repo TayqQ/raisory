@@ -16,6 +16,7 @@ import { createWindowLimiter } from "./registry/rate-limit";
 import type { PipelineDeps } from "./run";
 import { createWebsiteFetcher } from "./websites/fetch-page";
 import { WEBSITE_CHECK_MODEL } from "./websites/llm-check";
+import { createLogoFetcher, withHostSpacing } from "./websites/logo-fetch";
 
 /** Companies House allows 600 requests in 5 minutes; SignalFeed stays at 500 (D52). */
 const CH_REQUESTS_PER_WINDOW = 500;
@@ -67,6 +68,8 @@ export function createPipelineDeps(env: EnvSource): Wired {
   const clock = { now: () => new Date() };
   const apiKey = parsed.OPENAI_API_KEY;
   const chKey = parsed.COMPANIES_HOUSE_API_KEY;
+  // Shared by the page and logo fetchers, so requests to one host keep one gap.
+  const websiteRobots = withHostSpacing(createRobotsChecker({ fetcher }));
 
   return {
     deps: {
@@ -111,8 +114,15 @@ export function createPipelineDeps(env: EnvSource): Wired {
       edgar: edgarClientOrNull(fetcher, parsed.HTTP_CONTACT, clock),
       websiteFetcher: (maxFetches) =>
         createWebsiteFetcher({
-          robots: createRobotsChecker({ fetcher }),
+          robots: websiteRobots,
           userAgent: buildUserAgent(parsed.HTTP_CONTACT),
+          maxFetches,
+        }),
+      logoFetcher: (maxFetches) =>
+        createLogoFetcher({
+          robots: websiteRobots,
+          userAgent: buildUserAgent(parsed.HTTP_CONTACT),
+          maxBytes: parsed.MAX_LOGO_BYTES,
           maxFetches,
         }),
       websiteLlm: apiKey

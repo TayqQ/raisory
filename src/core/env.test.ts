@@ -46,7 +46,20 @@ describe("parsePipelineEnv", () => {
       MAX_EDGAR_REQUESTS_PER_RUN: 3000,
       MAX_WEBSITE_FETCHES_PER_RUN: 300,
       MAX_WEBSITE_MINUTES_PER_RUN: 10,
+      MAX_LOGO_BYTES: 65536,
     });
+  });
+
+  it("reads MAX_LOGO_BYTES up to the 64 KB the table holds", () => {
+    expect(
+      parsePipelineEnv({ ...secrets, MAX_LOGO_BYTES: "32768" }).MAX_LOGO_BYTES,
+    ).toBe(32768);
+    expect(() =>
+      parsePipelineEnv({ ...secrets, MAX_LOGO_BYTES: "65537" }),
+    ).toThrow();
+    expect(() =>
+      parsePipelineEnv({ ...secrets, MAX_LOGO_BYTES: "0" }),
+    ).toThrow();
   });
 
   it("treats empty strings as unset so defaults still apply", () => {

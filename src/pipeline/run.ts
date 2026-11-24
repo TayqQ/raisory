@@ -74,6 +74,7 @@ import type { ChClient } from "./registry/ch-client";
 import { confirmStep } from "./registry/confirm-events";
 import { registryStep as companiesHouseStep } from "./registry/registry-step";
 import type { WebsiteFetcher } from "./websites/fetch-page";
+import type { LogoFetcher } from "./websites/logo-fetch";
 import { websitesStep, type WebsiteRunStats } from "./websites/websites-step";
 import { recomputeEvent } from "./resolve/canonicalise";
 import { resolveExtraction } from "./resolve/resolve-extraction";
@@ -213,6 +214,11 @@ export interface PipelineDeps {
    * command, never by `run`.
    */
   websiteFetcher?: (maxFetches: number) => WebsiteFetcher;
+  /**
+   * Makes the run's logo fetcher, limited to this many requests (the page
+   * limit's number). Absent: the websites step fetches no logos.
+   */
+  logoFetcher?: (maxFetches: number) => LogoFetcher;
   /**
    * The website check client, bound to the website check model. Null or
    * absent: candidates that need the check wait for review (rule C1).
@@ -1045,13 +1051,13 @@ export async function websitesRunStep(
     };
   }
   try {
-    const fetcher = deps.websiteFetcher(
-      maxFetches ?? deps.config.maxWebsiteFetchesPerRun ?? 300,
-    );
+    const limit = maxFetches ?? deps.config.maxWebsiteFetchesPerRun ?? 300;
+    const fetcher = deps.websiteFetcher(limit);
     const stats = await websitesStep({
       db: deps.db,
       clock: deps.clock,
       fetcher,
+      logoFetcher: deps.logoFetcher?.(limit),
       llm: deps.websiteLlm ?? null,
       budget: deps.budget,
       runId: deps.runId,

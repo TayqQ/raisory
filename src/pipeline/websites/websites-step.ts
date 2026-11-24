@@ -8,6 +8,10 @@
 // The step stops between companies at the time limit or when the run's page
 // limit is used up. A company stopped part way is not recorded, so it stays
 // due for the next run. Nothing here stores page text.
+//
+// Logos (D72): when a check links a website, the step fetches its logo from
+// the icons the homepage listed. At the end it deletes the logos of companies
+// with no linked website, then retries a few linked websites with no logo.
 
 import { createHash } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
@@ -32,6 +36,13 @@ import { TimeLimit } from "@/pipeline/step-timing";
 import { websiteCandidates, type WebsiteCandidate } from "./candidates";
 import type { WebsiteFetcher } from "./fetch-page";
 import { WEBSITE_CHECK_MODEL, verifyWebsite } from "./llm-check";
+import type { LogoFetcher } from "./logo-fetch";
+import {
+  deleteUnlinkedLogos,
+  logosDue,
+  refreshLogo,
+  type RefreshLogoResult,
+} from "./logo-store";
 import {
   decideWebsite,
   type WebsiteCompany,
@@ -46,6 +57,8 @@ export const RECHECK_DAYS = 180;
 export const DEFAULT_WEBSITE_MINUTES = 10;
 /** The step stops after this many companies in a row fail with an error. */
 export const MAX_CONSECUTIVE_ERRORS = 3;
+/** Linked websites with no logo retried per run, after the checks. */
+export const MAX_LOGO_RETRIES_PER_RUN = 20;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ID_CHUNK = 500;
@@ -84,6 +97,15 @@ export interface WebsiteRunStats {
   stoppedAtTime: boolean;
   stoppedAtFetchCap: boolean;
   stoppedAtErrors: boolean;
+  /** Logos stored or replaced. */
+  logosStored: number;
+  /** Linked websites where no candidate gave a usable icon. */
+  logosNone: number;
+  /** Logos deleted because the company has no linked website. */
+  logosRemoved: number;
+  /** Logo requests this run, redirects included. */
+  logoFetches: number;
+  maxLogoFetches: number;
 }
 
 export function emptyWebsiteStats(): WebsiteRunStats {
@@ -105,6 +127,11 @@ export function emptyWebsiteStats(): WebsiteRunStats {
     stoppedAtTime: false,
     stoppedAtFetchCap: false,
     stoppedAtErrors: false,
+    logosStored: 0,
+    logosNone: 0,
+    logosRemoved: 0,
+    logoFetches: 0,
+    maxLogoFetches: 0,
   };
 }
 
@@ -113,6 +140,8 @@ export interface WebsitesStepOptions {
   clock: Clock;
   /** One fetcher per run: it holds the page limit and the host spacing. */
   fetcher: WebsiteFetcher;
+  /** One per run. Without it no logo is fetched, but unlinked logos are still deleted. */
+  logoFetcher?: LogoFetcher;
   /** Null without an LLM key: candidates that need the check become C1. */
   llm: LlmClient | null;
   budget: BudgetGuard;
@@ -497,6 +526,11 @@ async function evaluateCompany(
   return results;
 }
 
+function countLogo(stats: WebsiteRunStats, result: RefreshLogoResult): void {
+  if (result.outcome === "stored") stats.logosStored += 1;
+  else if (result.outcome === "none") stats.logosNone += 1;
+}
+
 function countResult(
   stats: WebsiteRunStats,
   status: "linked" | "candidate" | "rejected",
@@ -518,10 +552,12 @@ function countResult(
 export async function websitesStep(
   options: WebsitesStepOptions,
 ): Promise<WebsiteRunStats> {
-  const { db, clock, fetcher, log } = options;
+  const { db, clock, fetcher, logoFetcher, log } = options;
   const stats = emptyWebsiteStats();
   const startRemaining = fetcher.remaining();
   stats.maxFetches = startRemaining;
+  const startLogoRemaining = logoFetcher?.remaining() ?? 0;
+  stats.maxLogoFetches = startLogoRemaining;
   const limit = new TimeLimit(
     clock,
     options.maxMinutes ?? DEFAULT_WEBSITE_MINUTES,
@@ -531,6 +567,35 @@ export async function websitesStep(
   const queue = await websiteQueue(db, now);
   stats.due = queue.length;
   let failures = 0;
+  let logoCapped = false;
+  const logoTried = new Set<number>();
+
+  /** Logo work never fails a company: an error is logged and the step goes on. */
+  async function logoFor(
+    companyId: number,
+    domain: string,
+    iconCandidates: WebsiteIconCandidate[],
+  ): Promise<void> {
+    if (!logoFetcher || logoCapped) return;
+    logoTried.add(companyId);
+    try {
+      const result = await refreshLogo(db, {
+        companyId,
+        domain,
+        iconCandidates,
+        fetcher: logoFetcher,
+        now: () => clock.now(),
+      });
+      countLogo(stats, result);
+      if (result.outcome === "cap") logoCapped = true;
+    } catch (error) {
+      log(
+        `websites: logo for company ${companyId} not stored: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
 
   try {
     for (const item of queue) {
@@ -555,6 +620,13 @@ export async function websitesStep(
           });
           if (written.outcome === "written") {
             countResult(stats, written.status, written.rule);
+            if (written.status === "linked" && !limit.reached()) {
+              await logoFor(
+                item.id,
+                result.decision.domain,
+                result.iconCandidates,
+              );
+            }
           } else if (written.outcome === "kept") {
             stats.kept += 1;
           }
@@ -579,8 +651,19 @@ export async function websitesStep(
         }
       }
     }
+
+    // Demoted, rejected or merged since the logo was stored.
+    stats.logosRemoved = await deleteUnlinkedLogos(db);
+    if (logoFetcher && !stats.stoppedAtErrors) {
+      for (const due of await logosDue(db, now, MAX_LOGO_RETRIES_PER_RUN)) {
+        if (logoCapped || limit.reached()) break;
+        if (logoTried.has(due.companyId)) continue;
+        await logoFor(due.companyId, due.domain, due.iconCandidates);
+      }
+    }
   } finally {
     stats.fetches = startRemaining - fetcher.remaining();
+    stats.logoFetches = startLogoRemaining - (logoFetcher?.remaining() ?? 0);
   }
   if (limit.hit) stats.stoppedAtTime = true;
 
@@ -594,7 +677,9 @@ export async function websitesStep(
   log(
     `websites: search off; checked ${stats.checked} of ${stats.due} due, ` +
       `linked ${stats.linked}, candidates ${stats.candidate}, rejected ${stats.rejected}, ` +
-      `blocked ${stats.blocked}, robots ${stats.robots}, fetches ${stats.fetches}${stop}`,
+      `blocked ${stats.blocked}, robots ${stats.robots}, fetches ${stats.fetches}; ` +
+      `logos stored ${stats.logosStored}, none usable ${stats.logosNone}, ` +
+      `removed ${stats.logosRemoved}, logo fetches ${stats.logoFetches}${stop}`,
   );
   return stats;
 }

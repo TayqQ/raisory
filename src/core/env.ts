@@ -77,6 +77,8 @@ export const pipelineEnvSchema = z.object({
     .min(1)
     .max(60)
     .default(10),
+  /** Largest company logo stored, in bytes. The table holds at most 64 KB. */
+  MAX_LOGO_BYTES: z.coerce.number().int().positive().max(65536).default(65536),
 });
 export type PipelineEnv = z.infer<typeof pipelineEnvSchema>;
 
