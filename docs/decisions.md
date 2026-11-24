@@ -401,3 +401,8 @@ Each entry records the decision, the alternatives considered, and why. New decis
 - **Fixing the rows:** the version bump to v4 lets `reextract --item` (fix-data `reextract-item`) re-run items 1831 and 1458. The re-run unlinks the old events, and an event left with no source is deleted. Other items are not re-extracted in bulk.
 - **Cost:** the system prompt grows by about 130 tokens, to about 1,100 (its size test now allows 1,150). At `gpt-5.6-luna` input prices that is about $0.03 per 1,000 extracted items.
 - **Not chosen:** a code rule that drops extra rounds of the same company from one item. It would also drop real multi-part raises, such as an equity round announced with a grant.
+
+## D71. The website check needs a fact beyond funding to say "same" (24 November 2026)
+- **Found:** the first live run of the website eval (`pnpm eval --websites --live`) replaced the hand-written LLM answers with real ones. The model said "same" for Imprint and imprint.co when our only fact was the $130 million round, so a guessed domain was linked on a matching name alone. The label sends that case to review.
+- **Prompt `website-check-v2`:** "same" now needs something the facts say about what the company does or where it is based to show on the page. A funding amount, round or valuation does not count. When the facts say nothing else, the answer is "unsure", and the candidate goes to review.
+- **Eval:** 61 cases, 22 automatic links, 0 wrong, precision 100%, recall 81.5%, for $0.004. Hone Health (its only fact is a longevity round) now goes to review instead of linking, and Agon (a valve maker's page) goes to review instead of being rejected. Both are safe outcomes.

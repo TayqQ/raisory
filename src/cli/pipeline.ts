@@ -18,6 +18,7 @@ import {
   runFormD,
   runGrants,
   runRegistry,
+  runWebsites,
   themesStep,
   type RunSummary,
 } from "@/pipeline/run";
@@ -49,6 +50,11 @@ Commands:
   registry   Link companies to Companies House and refresh their profiles,
              then rebuild confirmations, locations and sectors. Needs
              COMPANIES_HOUSE_API_KEY; recorded as skipped without it
+  websites   Find and check each company's own website: news companies first,
+             then grant-only companies with a UKRI website. Reads the homepage
+             politely (robots.txt honoured), stops between companies at
+             MAX_WEBSITE_MINUTES_PER_RUN or MAX_WEBSITE_FETCHES_PER_RUN.
+             Search is off. Needs no LLM key; recorded as a run
   formd      Fetch SEC Form D filings for days not yet done, link issuers to
              companies, then rebuild confirmations. Needs an email address in
              HTTP_CONTACT. Recorded as a run
@@ -59,7 +65,7 @@ Commands:
   stats      Rebuild company locations and the derived stats tables
 
 Options:
-  --trigger schedule|manual   run, enrich, grants, registry, formd: recorded on the run
+  --trigger schedule|manual   run, enrich, grants, websites, registry, formd: recorded on the run
                               (default manual)
   --prompt-version <v>        reextract: must match this build's prompt
   --item <id>                 reextract: one source item instead of a batch
@@ -74,6 +80,8 @@ Options:
   --max-requests <n>          registry: most Companies House requests (default
                               MAX_CH_REQUESTS_PER_RUN). formd: most EDGAR
                               requests (default MAX_EDGAR_REQUESTS_PER_RUN)
+  --max-fetches <n>           websites: most pages read (default
+                              MAX_WEBSITE_FETCHES_PER_RUN)
   --max-days <n>              formd: most index days (default
                               MAX_EDGAR_DAYS_PER_RUN)
   --force                     stats: rebuild even when nothing has changed
@@ -82,7 +90,7 @@ Options:
 Without OPENAI_API_KEY, run still collects and rebuilds stats, and enrich
 still resolves grants. Extraction, grant tagging, embedding and theme naming
 wait for a key.
-registry and formd never need an LLM key.`;
+registry, formd and websites never need an LLM key.`;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -129,6 +137,7 @@ async function main(): Promise<number> {
       "max-pages": { type: "string" },
       "max-orgs": { type: "string" },
       "max-requests": { type: "string" },
+      "max-fetches": { type: "string" },
       "max-days": { type: "string" },
       force: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
@@ -167,6 +176,10 @@ async function main(): Promise<number> {
       run: () => runAll(deps, lock, trigger),
       enrich: () => runEnrich(deps, lock, trigger),
       grants: () => runGrants(deps, lock, trigger, grantOptions),
+      websites: () =>
+        runWebsites(deps, lock, trigger, {
+          maxFetches: positiveInt(values["max-fetches"], "--max-fetches"),
+        }),
       registry: () => runRegistry(deps, lock, trigger, { maxRequests }),
       formd: () => runFormD(deps, lock, trigger, formDOptions),
     };

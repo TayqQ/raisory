@@ -45,6 +45,7 @@ describe("parsePipelineEnv", () => {
       MAX_EDGAR_DAYS_PER_RUN: 10,
       MAX_EDGAR_REQUESTS_PER_RUN: 3000,
       MAX_WEBSITE_FETCHES_PER_RUN: 300,
+      MAX_WEBSITE_MINUTES_PER_RUN: 10,
     });
   });
 
@@ -338,6 +339,18 @@ describe("grants speed settings and site indexing", () => {
     for (const value of ["0", "-5", "1.5", "many"]) {
       expect(() =>
         parsePipelineEnv({ ...secrets, MAX_WEBSITE_FETCHES_PER_RUN: value }),
+      ).toThrow(ConfigError);
+    }
+  });
+
+  it("reads the website time limit as whole minutes from 1 to 60", () => {
+    expect(
+      parsePipelineEnv({ ...secrets, MAX_WEBSITE_MINUTES_PER_RUN: "5" })
+        .MAX_WEBSITE_MINUTES_PER_RUN,
+    ).toBe(5);
+    for (const value of ["0", "61", "-1", "2.5", "soon"]) {
+      expect(() =>
+        parsePipelineEnv({ ...secrets, MAX_WEBSITE_MINUTES_PER_RUN: value }),
       ).toThrow(ConfigError);
     }
   });

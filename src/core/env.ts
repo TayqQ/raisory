@@ -70,6 +70,13 @@ export const pipelineEnvSchema = z.object({
   // Company websites
   /** Most pages read from company websites per run, manifests and legal pages included. */
   MAX_WEBSITE_FETCHES_PER_RUN: z.coerce.number().int().positive().default(300),
+  /** Time limit for the websites step, checked between companies. */
+  MAX_WEBSITE_MINUTES_PER_RUN: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(60)
+    .default(10),
 });
 export type PipelineEnv = z.infer<typeof pipelineEnvSchema>;
 

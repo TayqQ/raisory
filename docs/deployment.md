@@ -57,7 +57,7 @@ Optional variables, with their defaults: `GTR_REQUESTS_PER_SECOND` (3), `MAX_GRA
 Two workflows use these settings:
 
 - **Ingest** (`.github/workflows/ingest.yml`), hourly at minute 17. It runs `pnpm ingest run`: collect, prefilter, extract, resolve and FX, then the cheap database rebuilds (locations, stats, confirmations, sectors). It stops itself between items at `MAX_INGEST_MINUTES_PER_RUN` (12 minutes) and logs the time each step took (`step extract: 4.2s (6 items)`); the 20-minute `timeout-minutes` is only the backstop. Grant tagging and resolution, tag embedding and themes no longer run hourly: they are in the daily `enrich` step (D67). Extraction skips cleanly with no key, and a budget pause stops extraction. When a run starts, it also closes any run left `running` for over 60 minutes as failed ("abandoned").
-- **Daily** (`.github/workflows/daily.yml`), at 05:41 UTC. The job has 93 minutes, and each step has its own timeout (grants 25, enrich 18, Companies House 25, Form D 15), so a slow step cannot starve the later ones. It runs four steps in order: `pnpm ingest grants`, which fetches new Innovate UK projects and organisations from UKRI Gateway to Research; `pnpm ingest enrich`, which tags and resolves grants, embeds tags and assigns and names themes (it uses the LLM key and budget, stops itself at `MAX_ENRICH_MINUTES_PER_RUN`, 15 minutes, and without a key still resolves grants); `pnpm ingest registry` (Companies House); and `pnpm ingest formd` (SEC Form D). Grants, registry and Form D are free and need no LLM key. A failing step does not skip the ones after it. The next hourly run rebuilds locations, stats and sectors from what enrich changed.
+- **Daily** (`.github/workflows/daily.yml`), at 05:41 UTC. The job has 105 minutes, and each step has its own timeout (grants 25, enrich 18, websites 12, Companies House 25, Form D 15), so a slow step cannot starve the later ones. It runs five steps in order: `pnpm ingest grants`, which fetches new Innovate UK projects and organisations from UKRI Gateway to Research; `pnpm ingest enrich`, which tags and resolves grants, embeds tags and assigns and names themes (it uses the LLM key and budget, stops itself at `MAX_ENRICH_MINUTES_PER_RUN`, 15 minutes, and without a key still resolves grants); `pnpm ingest websites` (company websites, section 10); `pnpm ingest registry` (Companies House); and `pnpm ingest formd` (SEC Form D). Grants, registry and Form D are free and need no LLM key. A failing step does not skip the ones after it. The next hourly run rebuilds locations, stats and sectors from what enrich changed.
 
 Both share the `ingest` concurrency group, so they never overlap, and the database run lock is a second guard. `INGEST_ENABLED` stops both.
 
@@ -131,6 +131,7 @@ Phase 3 links companies to Companies House and SEC filings and marks news rounds
 
 - **Hourly** (`pnpm ingest run`): after extraction and FX, it rebuilds locations and stats, then confirmations (`event_confirmations` and `events.evidence`) and then sectors (`company_sectors`). Both use the database only, and skip when nothing changed. The locations step also uses registered offices. `run` never calls Companies House or EDGAR.
 - **Daily**, after grants:
+  - `pnpm ingest websites`: finds and checks each company's own homepage, news companies first, then grant-only companies with a UKRI website. It reads at most `MAX_WEBSITE_FETCHES_PER_RUN` (300) pages (a legal page or a manifest counts as one) and stops at `MAX_WEBSITE_MINUTES_PER_RUN` (10) minutes, whichever comes first. Both limits are checked between companies, so a company is never half recorded; what is left stays due. A company is checked again after 180 days, or sooner when its name, aliases, country, Companies House number or candidate domains change. Search is off. The pages are read politely (robots.txt, one request a second per site, no workaround for a block). It needs no LLM key: without one, the few candidates that need the model's check wait for review. The step summary shows the companies checked, the results by rule, the sites that blocked us (401, 403 or 429) and the pages read. Pause it with the variable `WEBSITES_ENABLED` set to `false`.
   - `pnpm ingest registry`: links companies to Companies House, refreshes linked profiles and fetches SH01 filings, at most `MAX_CH_REQUESTS_PER_RUN` (2,000) requests, and it stops at `MAX_CH_MINUTES_PER_RUN` (17) minutes, checked between companies, whichever comes first. What is left stays due for the next run. Then it rebuilds confirmations, locations and sectors, so new links show at once. The summary shows "Stopped early: time limit" when the time limit ended it. Without `COMPANIES_HOUSE_API_KEY` the run is recorded as skipped and the step succeeds.
   - `pnpm ingest formd`: fetches the EDGAR daily indexes for days not yet done (up to yesterday, US Eastern time), stores each non-fund Form D and D/A, links issuers to companies, then rebuilds confirmations. At most `MAX_EDGAR_DAYS_PER_RUN` (10) days and `MAX_EDGAR_REQUESTS_PER_RUN` (3,000) requests, about 10 minutes. If `HTTP_CONTACT` has no email address it refuses, fetches nothing and the step fails.
 
@@ -155,7 +156,7 @@ Each command is recorded as a run under the run lock, and its stats show on `/st
    pnpm ingest relink-grants
    ```
 
-Optional variables, with their defaults: `MAX_CH_REQUESTS_PER_RUN` (2000), `MAX_CH_MINUTES_PER_RUN` (17, whole minutes from 1 to 60), `MAX_EDGAR_DAYS_PER_RUN` (10) and `MAX_EDGAR_REQUESTS_PER_RUN` (3000). The daily workflow passes them when set. Keep the daily job under its 93-minute limit: grants has 25 minutes, enrich 18 (it stops itself at 15), the registry step 25 (it stops itself at 17) and Form D 15.
+Optional variables, with their defaults: `MAX_WEBSITE_FETCHES_PER_RUN` (300), `MAX_WEBSITE_MINUTES_PER_RUN` (10, whole minutes from 1 to 60), `MAX_CH_REQUESTS_PER_RUN` (2000), `MAX_CH_MINUTES_PER_RUN` (17, whole minutes from 1 to 60), `MAX_EDGAR_DAYS_PER_RUN` (10) and `MAX_EDGAR_REQUESTS_PER_RUN` (3000). The daily workflow passes them when set. Keep the daily job under its 105-minute limit: grants has 25 minutes, enrich 18 (it stops itself at 15), websites 12 (it stops itself at 10), the registry step 25 (it stops itself at 17) and Form D 15.
 
 In short, you must set:
 
@@ -187,6 +188,7 @@ The daily steps only move forward a little each day. To load history (`docs/spec
 
 | To pause | Do this |
 |---|---|
+| The websites step | Set the variable `WEBSITES_ENABLED` to `false` |
 | The registry step | Set the variable `REGISTRY_ENABLED` to `false`, or delete the `COMPANIES_HOUSE_API_KEY` secret (runs are then recorded as skipped) |
 | The Form D step | Set the variable `FORMD_ENABLED` to `false` |
 | Everything | Set `INGEST_ENABLED` to anything but `true` |
@@ -196,6 +198,10 @@ Remove the variable, or set it to anything else, to resume. Nothing is lost whil
 ### Review links
 
 Automatic links are strict, so some companies wait for review. Review them from your machine with `pnpm registry` (`list`, `show`, `approve`, `reject`, `link`, `unlink`). It never calls an API, and the web app cannot run it. Manual decisions are final. Confirmations and sectors catch up on the next hourly run.
+
+### Review websites
+
+A website links automatically only on strong evidence (decision D64). A weaker match becomes a candidate and waits for review: `pnpm registry list --websites` shows each candidate with the company's description, the rule, the evidence and the address to check, and `pnpm registry approve --website <id>` or `pnpm registry reject --website <id>` decides it. A manual decision is final. The same three actions run from the private repo as `website-list`, `website-approve` and `website-reject` (see the table below).
 
 ### Fix data by hand
 
@@ -209,6 +215,9 @@ A wrong company name, or an article read wrongly, can be fixed from the private 
 | `registry-list` | none | Lists open Companies House candidates with their evidence and the register URL (`pnpm registry list`) |
 | `registry-approve` | `id`: candidate ids, separated by spaces | Links those candidates (`pnpm registry approve`). Manual, so final. Unticked, it only previews |
 | `registry-reject` | `id`: candidate ids, separated by spaces | Rejects them, so they're never proposed again (`pnpm registry reject`). Unticked, it only previews |
+| `website-list` | none | Lists open website candidates with the rule, the evidence and the address to check (`pnpm registry list --websites`) |
+| `website-approve` | `id`: website ids from the list, separated by spaces | Links those websites (`pnpm registry approve --website`). Manual, so final. Unticked, it only previews |
+| `website-reject` | `id`: website ids from the list, separated by spaces | Rejects them, linked ones included, so they're never proposed again (`pnpm registry reject --website`). Unticked, it only previews |
 
 For a company created under a placeholder name, such as "startup": if the article names the company in its opening, run `reextract-item` on the article; the event moves to a company with the right name, and the placeholder company is left with no events. To keep the old company row instead (its id, first-seen date and registry links), rename it first, then re-extract: the event then resolves to the renamed company by name. If the rename preview lists `sameNameIds`, a company with that name already exists: merge instead. The same commands run locally as `pnpm entities rename` and `pnpm ingest reextract --item`.
 

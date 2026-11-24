@@ -14,6 +14,8 @@ import { dedicatedConnectionLock, type IngestLock } from "./lock";
 import { createChClient } from "./registry/ch-client";
 import { createWindowLimiter } from "./registry/rate-limit";
 import type { PipelineDeps } from "./run";
+import { createWebsiteFetcher } from "./websites/fetch-page";
+import { WEBSITE_CHECK_MODEL } from "./websites/llm-check";
 
 /** Companies House allows 600 requests in 5 minutes; SignalFeed stays at 500 (D52). */
 const CH_REQUESTS_PER_WINDOW = 500;
@@ -107,6 +109,15 @@ export function createPipelineDeps(env: EnvSource): Wired {
           })
         : null,
       edgar: edgarClientOrNull(fetcher, parsed.HTTP_CONTACT, clock),
+      websiteFetcher: (maxFetches) =>
+        createWebsiteFetcher({
+          robots: createRobotsChecker({ fetcher }),
+          userAgent: buildUserAgent(parsed.HTTP_CONTACT),
+          maxFetches,
+        }),
+      websiteLlm: apiKey
+        ? createOpenAiClient({ apiKey, model: WEBSITE_CHECK_MODEL })
+        : null,
       budget: createBudgetGuard({
         db,
         clock,
@@ -129,6 +140,8 @@ export function createPipelineDeps(env: EnvSource): Wired {
         maxGrantOrgFetchesPerRun: parsed.MAX_GRANT_ORG_FETCHES_PER_RUN,
         maxChRequestsPerRun: parsed.MAX_CH_REQUESTS_PER_RUN,
         maxChMinutesPerRun: parsed.MAX_CH_MINUTES_PER_RUN,
+        maxWebsiteFetchesPerRun: parsed.MAX_WEBSITE_FETCHES_PER_RUN,
+        maxWebsiteMinutesPerRun: parsed.MAX_WEBSITE_MINUTES_PER_RUN,
         maxEdgarDaysPerRun: parsed.MAX_EDGAR_DAYS_PER_RUN,
         maxEdgarRequestsPerRun: parsed.MAX_EDGAR_REQUESTS_PER_RUN,
       },

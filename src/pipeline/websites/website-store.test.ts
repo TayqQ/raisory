@@ -205,6 +205,28 @@ describe("recordWebsiteResult", () => {
     expect((await rows(company.id))[0]?.status).toBe("candidate");
   });
 
+  it("records the time of a re-check that could not read the page", async () => {
+    const company = await insertCompany("brightwell");
+    await recordWebsiteResult(
+      db,
+      result(company.id, { status: "candidate", rule: "C2", judged: false }),
+    );
+    const later = new Date("2027-05-23T06:00:00Z");
+    const written = await recordWebsiteResult(db, {
+      ...result(company.id, {
+        status: "candidate",
+        rule: "C2",
+        judged: false,
+      }),
+      fingerprint: "next",
+      now: later,
+    });
+    expect(written.outcome).toBe("kept");
+    const [row] = await rows(company.id);
+    expect(row?.checkedAt).toEqual(later);
+    expect(row?.fingerprint).toBe("next");
+  });
+
   it("never re-links a manual rejection", async () => {
     const company = await insertCompany("brightwell");
     await recordWebsiteResult(

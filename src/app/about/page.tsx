@@ -603,6 +603,61 @@ export default function AboutPage() {
           </p>
         </section>
 
+        <section id="websites" className="mt-10 scroll-mt-6">
+          <h2 className="text-xl font-semibold">
+            How we find company websites
+          </h2>
+          <p className="mt-3 text-ink">
+            A company&rsquo;s website is the company&rsquo;s own homepage. We
+            look for it in this order: the web address an article gives, the
+            website UKRI holds for the organisation, the company name written as
+            an address (such as &ldquo;bit.bio&rdquo;), and a few likely
+            addresses made from the name.
+          </p>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-ink">
+            <li>
+              <strong className="font-medium text-ink">Read politely.</strong>{" "}
+              We read the homepage, and one legal or contact page when the
+              homepage shows no company number. We check each site&rsquo;s
+              robots.txt first and stay away when it says no. We make about one
+              request a second to a site, identify ourselves in each request,
+              and never work around a block. A site that blocks us is never
+              linked automatically.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">
+                What we keep and what we don&rsquo;t.
+              </strong>{" "}
+              We look at the page title, the site name, the short description
+              and a UK company number. We keep the address we decided on and a
+              short reason. We do not store the page, and we never store names
+              or contact details from it.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">
+                When we link a website.
+              </strong>{" "}
+              Only when the page shows the company&rsquo;s own Companies House
+              number, or the page names the company and the address came from an
+              article or UKRI, or the name matches and a language model confirms
+              the page belongs to the same company. Anything less certain waits
+              for a person to check. A missing link is better than a wrong one.
+            </li>
+          </ul>
+          <p className="mt-3 text-ink">
+            A company can ask for its website link to be removed, or report a
+            wrong one,{" "}
+            <a
+              href={GITHUB_ISSUES_URL}
+              className={LINK_CLASS}
+              rel="noopener noreferrer"
+            >
+              on GitHub
+            </a>
+            . Give the company name and the address.
+          </p>
+        </section>
+
         <section className="mt-10">
           <h2 className="text-xl font-semibold">How quality is measured</h2>
           <p className="mt-3 text-ink">

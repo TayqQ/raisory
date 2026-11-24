@@ -73,6 +73,8 @@ import { type IngestLock, withIngestLock } from "./lock";
 import type { ChClient } from "./registry/ch-client";
 import { confirmStep } from "./registry/confirm-events";
 import { registryStep as companiesHouseStep } from "./registry/registry-step";
+import type { WebsiteFetcher } from "./websites/fetch-page";
+import { websitesStep, type WebsiteRunStats } from "./websites/websites-step";
 import { recomputeEvent } from "./resolve/canonicalise";
 import { resolveExtraction } from "./resolve/resolve-extraction";
 import { isPlaceholderCompanyName } from "./names/placeholder";
@@ -129,7 +131,7 @@ export const ABANDONED_ERROR =
 /** What a run stores: the usual stats, plus step timings and the time-limit flag. */
 export type RunStats = Omit<IngestStats, "collect"> & {
   collect: RunCollectStats;
-} & Partial<TimingStats>;
+} & Partial<TimingStats> & { websites?: WebsiteRunStats };
 
 /**
  * Collect stats plus feeds skipped by robots.txt (D68). A skipped feed is not
@@ -169,6 +171,10 @@ export interface PipelineConfig {
   maxChRequestsPerRun: number;
   /** `MAX_CH_MINUTES_PER_RUN`. The registry step uses 17 when missing. */
   maxChMinutesPerRun?: number;
+  /** `MAX_WEBSITE_FETCHES_PER_RUN`. The websites step uses 300 when missing. */
+  maxWebsiteFetchesPerRun?: number;
+  /** `MAX_WEBSITE_MINUTES_PER_RUN`. The websites step uses 10 when missing. */
+  maxWebsiteMinutesPerRun?: number;
   /** `MAX_EDGAR_DAYS_PER_RUN`. */
   maxEdgarDaysPerRun: number;
   /** `MAX_EDGAR_REQUESTS_PER_RUN`. */
@@ -201,6 +207,17 @@ export interface PipelineDeps {
    * `pnpm ingest formd`, never by `run`.
    */
   edgar: EdgarClient | null;
+  /**
+   * Makes the run's page fetcher for company websites, limited to this many
+   * pages. Absent: `pnpm ingest websites` cannot run. Used only by that
+   * command, never by `run`.
+   */
+  websiteFetcher?: (maxFetches: number) => WebsiteFetcher;
+  /**
+   * The website check client, bound to the website check model. Null or
+   * absent: candidates that need the check wait for review (rule C1).
+   */
+  websiteLlm?: LlmClient | null;
   budget: BudgetGuard;
   fx: FxProvider;
   clock: Clock;
@@ -1013,6 +1030,40 @@ export async function companiesHouseRegistryStep(
   }
 }
 
+/**
+ * The websites step: finds and checks each due company's own homepage, within
+ * the time limit and the page limit. Search is off.
+ */
+export async function websitesRunStep(
+  deps: PipelineDeps,
+  { maxFetches }: { maxFetches?: number } = {},
+): Promise<StepOutcome<WebsiteRunStats>> {
+  if (!deps.websiteFetcher) {
+    return {
+      errors: [failure("websites", new Error("no website fetcher is wired"))],
+      stopsPaidSteps: false,
+    };
+  }
+  try {
+    const fetcher = deps.websiteFetcher(
+      maxFetches ?? deps.config.maxWebsiteFetchesPerRun ?? 300,
+    );
+    const stats = await websitesStep({
+      db: deps.db,
+      clock: deps.clock,
+      fetcher,
+      llm: deps.websiteLlm ?? null,
+      budget: deps.budget,
+      runId: deps.runId,
+      maxMinutes: deps.config.maxWebsiteMinutesPerRun,
+      log: deps.log,
+    });
+    return { stats, errors: [], stopsPaidSteps: false };
+  } catch (error) {
+    return { errors: [failure("websites", error)], stopsPaidSteps: false };
+  }
+}
+
 export interface FormDStepOptions {
   since?: string;
   maxDays?: number;
@@ -1462,6 +1513,38 @@ export async function runRegistry(
     const sectors = track(await sectorsStep(scoped));
     return {
       stats: { ...base, registry, confirm, locations, sectors },
+      errors,
+    };
+  });
+}
+
+export interface WebsitesRunOptions {
+  /** Overrides `MAX_WEBSITE_FETCHES_PER_RUN`. */
+  maxFetches?: number;
+}
+
+/**
+ * `pnpm ingest websites`: one locked, recorded run of the websites step.
+ * It needs no LLM key; the few checks that need the model wait for review
+ * without one.
+ */
+export async function runWebsites(
+  deps: PipelineDeps,
+  lock: IngestLock,
+  trigger: IngestTrigger,
+  options: WebsitesRunOptions = {},
+): Promise<RunSummary> {
+  return recordedRun(deps, lock, trigger, async (scoped) => {
+    const errors: string[] = [];
+    const outcome = await websitesRunStep(scoped, options);
+    errors.push(...outcome.errors);
+    const base = await emptyRunStats(scoped);
+    return {
+      stats: {
+        ...base,
+        websites: outcome.stats,
+        ...(outcome.stats?.stoppedAtTime ? { stoppedAtTime: true } : {}),
+      },
       errors,
     };
   });

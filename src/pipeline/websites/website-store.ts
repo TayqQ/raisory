@@ -164,7 +164,8 @@ async function clearWebsiteDomain(
  * Stores one automatic decision, keeping the invariants above. A `linked`
  * decision becomes a `candidate` when the company already has another linked
  * domain, or (rule X3) when another company holds this one. A decision made
- * without reading the page leaves an automatic link or candidate in place. Re-checking a
+ * without reading the page leaves an automatic link or candidate in place
+ * (only its check time and fingerprint move). Re-checking a
  * linked domain with another result demotes it and clears the column.
  */
 export async function recordWebsiteResult(
@@ -184,6 +185,12 @@ export async function recordWebsiteResult(
     );
     if (manualLink) return { outcome: "blocked", id: null };
     if (!decision.judged && same && same.status !== "rejected") {
+      // The result stands, but the check happened: record when, so the
+      // domain is read again at the next re-check and not on every run.
+      await tx
+        .update(companyWebsites)
+        .set({ checkedAt: input.now, fingerprint: input.fingerprint })
+        .where(eq(companyWebsites.id, same.id));
       return { outcome: "kept", id: same.id };
     }
 
