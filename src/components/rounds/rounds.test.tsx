@@ -19,6 +19,7 @@ const NOW = new Date("2026-11-18T12:00:00Z");
 function row(overrides: Partial<FundingRow> = {}): FundingRow {
   return {
     eventId: 1,
+    companyId: 1,
     companySlug: "northwind-robotics",
     companyName: "Northwind Robotics",
     countryCode: "GB",
@@ -377,5 +378,28 @@ describe("chipLabel", () => {
     expect(chipLabel("Series C financing round")).toBeUndefined();
     expect(chipLabel("seed funding")).toBeUndefined();
     expect(chipLabel(null)).toBeUndefined();
+  });
+});
+
+describe("logos in the rounds views", () => {
+  it("uses the logo by company id and keeps the monogram for the rest", () => {
+    const rows = [
+      row({ eventId: 1, companyId: 1, companyName: "Has Logo" }),
+      row({ eventId: 2, companyId: 2, companyName: "No Logo" }),
+    ];
+    const logoUrls = { 1: "/logos/1-abababab.png" };
+    const list = render(<RoundList rows={rows} logoUrls={logoUrls} />);
+    expect(list.container.querySelectorAll("img[src^='/logos/']")).toHaveLength(
+      1,
+    );
+    expect(list.container.querySelector("img[src^='/logos/']")).toHaveAttribute(
+      "src",
+      "/logos/1-abababab.png",
+    );
+    list.unmount();
+    const cards = render(<RoundCards rows={rows} logoUrls={logoUrls} />);
+    expect(
+      cards.container.querySelectorAll("img[src^='/logos/']"),
+    ).toHaveLength(1);
   });
 });

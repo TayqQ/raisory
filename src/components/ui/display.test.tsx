@@ -5,6 +5,7 @@ import { Button } from "./button";
 import { Chip, FilterChip } from "./chip";
 import { ConfirmedMark } from "./confirmed-mark";
 import { EmptyState } from "./empty-state";
+import { CompanyMark } from "./company-mark";
 import { Monogram, monogramLetters, monogramTint } from "./monogram";
 import { NewMark } from "./new-mark";
 import { PlaceBadge } from "./place-badge";
@@ -293,5 +294,41 @@ describe("EmptyState", () => {
       screen.getByText("We have not matched this company."),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+  });
+});
+
+describe("CompanyMark", () => {
+  it("shows the monogram when there is no logo", () => {
+    const { container } = render(
+      <CompanyMark name="Acme Robotics" size={40} />,
+    );
+    expect(container.querySelector("img")).toBeNull();
+    expect(container).toHaveTextContent("AR");
+    expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true");
+    const empty = render(<CompanyMark name="Acme" logoUrl={null} />);
+    expect(empty.container.querySelector("img")).toBeNull();
+  });
+
+  it("shows the logo on a light tile with a theme-aware hairline border", () => {
+    const { container } = render(
+      <CompanyMark name="Acme" logoUrl="/logos/7-abababab.png" size={40} />,
+    );
+    const img = container.querySelector("img")!;
+    expect(img).toHaveAttribute("src", "/logos/7-abababab.png");
+    expect(img).toHaveAttribute("alt", "");
+    expect(img).toHaveAttribute("width", "40");
+    expect(img).toHaveAttribute("height", "40");
+    expect(img).toHaveClass("object-contain");
+    const tile = container.firstElementChild!;
+    // A fixed white tile and the `line` token (which flips with the theme),
+    // so a dark logo stays visible in dark mode.
+    expect(tile).toHaveClass(
+      "bg-white",
+      "border",
+      "border-line",
+      "h-10",
+      "w-10",
+    );
+    expect(container).not.toHaveTextContent("A");
   });
 });

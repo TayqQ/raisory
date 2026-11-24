@@ -82,6 +82,7 @@ Each component is small and has no data access: it takes values, renders them, a
 | Component | What it shows | Notes |
 |---|---|---|
 | `Monogram` | 1-2 letters on a tint picked from the name | Sizes 24, 28, 40, 56. `aria-hidden` (the name is always next to it) |
+| `CompanyMark` | The company's logo on a light tile, or its `Monogram` when it has no logo | Same sizes as `Monogram` (24, 28, 40, 56). See below |
 | `Amount` | GBP first, original currency small beneath when it differs | "Undisclosed" in muted text when null. Sizes `sm` (list) and `lg` (company) |
 | `StageChip` | Stage text on a filled label in the stage's soft colour | Never colour alone. Text on every fill is at least 4.5:1 in both themes (`src/lib/stage.test.ts`). Normalised label (`Series F` shows "Series F" but uses the late-stage colour) |
 | `ConfirmedMark` | Tick icon plus "Confirmed" | Its title is the confirmation text. It replaces the current `confirmed-marker` look and keeps its tests |
@@ -103,6 +104,16 @@ Views (`src/components/rounds/`):
 - `ViewSwitch`.
 
 All of them take `rows: FundingRow[]` plus selection state, nothing else.
+
+### Company marks
+`CompanyMark` replaces `Monogram` wherever a company is named: round lists and cards, the biggest rounds in the summary, similar companies and the company page header.
+
+- **Logo:** the tile is white in both themes, so a dark logo stays visible in dark mode. It has a hairline `border-line` border (the token follows the theme), the monogram's radius and a small padding (3 px at 24 and 28, 4 px at 40, 6 px at 56). The image fills the padded tile with `object-fit: contain` and carries explicit `width` and `height`, so nothing shifts as it loads.
+- **Alt text:** empty. The company's name is always beside the mark.
+- **Fallback:** with no logo the `Monogram` shows, unchanged.
+- **Source:** the `logoUrl` is always a `/logos/...` address from `getLogoUrls` (D72), fetched once per list. A company's own image is never linked to directly.
+- **Server only:** it renders on the server and adds no client JavaScript.
+- **Website link:** the company page header shows the website's bare domain as a link only while the website is verified (`companies.website_domain`, D64). A candidate or rejected website shows nothing.
 
 ## 5. Data each view needs (task 076)
 `FundingRow` gains `companyDescription` (one line, from `companies.description`), `mainSector` (a sector key, or null, using the order in research section 5), and `websiteDomain` (null for now). The stage colour comes from `stageBucket(roundType)` in `src/lib/stage.ts` (task 075) at render time, so it is not a row field.

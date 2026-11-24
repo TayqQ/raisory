@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Sector } from "@/core/sectors";
 import type { ThemeRef } from "@/core/read-models";
 import { Chip } from "@/components/ui/chip";
-import { Monogram } from "@/components/ui/monogram";
+import { CompanyMark } from "@/components/ui/company-mark";
 import { PlaceBadge } from "@/components/ui/place-badge";
 import { SectorLabel } from "@/components/ui/sector-label";
 
@@ -21,6 +21,8 @@ export function CompanyHeader({
   mainSector,
   statuses,
   themes,
+  logoUrl,
+  websiteDomain,
 }: {
   name: string;
   description: string | null;
@@ -31,16 +33,24 @@ export function CompanyHeader({
   /** For example "Acquired" or "Dissolved on 3 May 2026". */
   statuses: string[];
   themes: ThemeRef[];
+  /** A `/logos/...` address (D72), or null to show the monogram. */
+  logoUrl?: string | null;
+  /**
+   * `companies.website_domain`, which is set only while the company's website
+   * is `linked` (D64). Null for candidate and rejected websites: no link.
+   */
+  websiteDomain?: string | null;
 }) {
   const standfirst = description?.trim() || null;
+  const domain = websiteDomain?.trim() || null;
   return (
     <header>
       <div className="flex items-center gap-3 sm:gap-4">
         <span className="sm:hidden">
-          <Monogram name={name} size={40} />
+          <CompanyMark name={name} logoUrl={logoUrl} size={40} />
         </span>
         <span className="hidden sm:inline-flex">
-          <Monogram name={name} size={56} />
+          <CompanyMark name={name} logoUrl={logoUrl} size={56} />
         </span>
         <h1 className="min-w-0 break-words font-display text-[24px] font-semibold leading-tight tracking-tight text-ink sm:text-[38px]">
           {name}
@@ -53,6 +63,19 @@ export function CompanyHeader({
       ) : (
         <p className="mt-2 text-[13px] text-muted">No description yet.</p>
       )}
+      {domain ? (
+        <p className="mt-1 text-[13px]">
+          <a
+            href={`https://${domain}`}
+            target="_blank"
+            rel="noopener nofollow"
+            className="break-all text-brand underline underline-offset-4"
+          >
+            {domain}
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </p>
+      ) : null}
       <p className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] sm:mt-3">
         <PlaceBadge countryCode={countryCode} city={place} size="lg" />
         <span aria-hidden="true" className="text-faint">

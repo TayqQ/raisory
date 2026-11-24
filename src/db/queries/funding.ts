@@ -578,6 +578,7 @@ export function sicCodesSql(): SQL<unknown> {
 
 export interface FundingRowSource {
   eventId: number;
+  companyId: number;
   companySlug: string;
   companyName: string;
   countryCode: string | null;
@@ -604,6 +605,7 @@ export interface FundingRowSource {
 export function fundingColumns() {
   return {
     eventId: events.id,
+    companyId: companies.id,
     companySlug: companies.slug,
     companyName: companies.name,
     countryCode: companies.countryCode,
@@ -754,6 +756,7 @@ export function readMomentum(value: unknown): RoundMomentum | null {
 export function toFundingRow(row: FundingRowSource): FundingRow {
   return {
     eventId: row.eventId,
+    companyId: row.companyId,
     companySlug: row.companySlug,
     companyName: row.companyName,
     countryCode: trimOrNull(row.countryCode),

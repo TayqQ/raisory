@@ -4,7 +4,7 @@ import type {
 } from "@/core/read-models";
 import { SECTOR_LABELS } from "@/core/sectors";
 import { Amount } from "@/components/ui/amount";
-import { Monogram } from "@/components/ui/monogram";
+import { CompanyMark } from "@/components/ui/company-mark";
 import { Stat } from "@/components/ui/stat";
 import { RoundName } from "@/components/rounds/round-row-parts";
 import { chipLabel } from "@/components/rounds/round-row-parts";
@@ -137,6 +137,7 @@ export function FundingSummary({
   filters,
   scope,
   periodHrefs,
+  logoUrls,
 }: {
   summary: FundingSummaryData;
   /** The list's filters, for the sector links and the "matching" note. */
@@ -144,6 +145,8 @@ export function FundingSummary({
   scope: SummaryScope;
   /** The current page with each period set, for the period control. */
   periodHrefs: Readonly<Record<SummaryPeriod, string>>;
+  /** Logo addresses by company id, from one `getLogoUrls` call. */
+  logoUrls?: Readonly<Record<number, string>>;
 }) {
   const words = describeScope(scope);
   const narrowed =
@@ -204,7 +207,7 @@ export function FundingSummary({
               />
             </div>
             <div className={`${BLOCK} px-4 py-3 xl:col-start-1 xl:row-start-2`}>
-              <BiggestRounds summary={summary} />
+              <BiggestRounds summary={summary} logoUrls={logoUrls} />
             </div>
           </div>
         )}
@@ -324,7 +327,13 @@ export function sectorBars(
   });
 }
 
-function BiggestRounds({ summary }: { summary: FundingSummaryData }) {
+function BiggestRounds({
+  summary,
+  logoUrls,
+}: {
+  summary: FundingSummaryData;
+  logoUrls?: Readonly<Record<number, string>>;
+}) {
   return (
     <div>
       <h3 className="font-display text-[17px] font-semibold text-ink">
@@ -347,7 +356,11 @@ function BiggestRounds({ summary }: { summary: FundingSummaryData }) {
               >
                 {index + 1}
               </span>
-              <Monogram name={row.companyName} size={28} />
+              <CompanyMark
+                name={row.companyName}
+                logoUrl={logoUrls?.[row.companyId]}
+                size={28}
+              />
               <span className="flex min-w-0 flex-1 flex-col">
                 <RoundName row={row} className="text-[15px]" />
                 <span className="truncate text-xs text-muted">

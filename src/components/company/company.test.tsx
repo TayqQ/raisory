@@ -210,6 +210,10 @@ describe("ActionRow", () => {
       "href",
       "https://acme.test",
     );
+    expect(screen.getByRole("link", { name: /Visit website/ })).toHaveAttribute(
+      "rel",
+      "noopener nofollow",
+    );
     expect(
       screen.getByRole("link", { name: /Companies House/ }),
     ).toHaveAttribute("href", ch.url);
@@ -481,6 +485,47 @@ describe("CompanyHeader", () => {
     );
   });
 
+  it("links a verified website by its bare domain, and shows a logo", () => {
+    const { container } = render(
+      <CompanyHeader
+        name="Acme"
+        description={null}
+        countryCode={null}
+        place={null}
+        mainSector={null}
+        statuses={[]}
+        themes={[]}
+        websiteDomain="acme.example"
+        logoUrl="/logos/7-abababab.png"
+      />,
+    );
+    const link = screen.getByRole("link", { name: /acme\.example/ });
+    expect(link).toHaveAttribute("href", "https://acme.example");
+    expect(link).toHaveAttribute("rel", "noopener nofollow");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(container.querySelector("img[src^='/logos/']")).toHaveAttribute(
+      "src",
+      "/logos/7-abababab.png",
+    );
+  });
+
+  it("shows no website link and the monogram without a domain or logo", () => {
+    const { container } = render(
+      <CompanyHeader
+        name="Acme"
+        description={null}
+        countryCode={null}
+        place={null}
+        mainSector={null}
+        statuses={[]}
+        themes={[]}
+        websiteDomain={null}
+      />,
+    );
+    expect(container.querySelector("a[href^='https://']")).toBeNull();
+    expect(container.querySelector("img[src^='/logos/']")).toBeNull();
+  });
+
   it("links a known sector to the filtered list", () => {
     render(
       <CompanyHeader
@@ -642,6 +687,7 @@ describe("SimilarCompanies", () => {
           roundType: "seed",
           items: [
             {
+              companyId: 11,
               slug: "beta-pay",
               name: "Beta Pay",
               countryCode: "GB",

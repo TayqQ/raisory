@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import type { FundingFilters } from "@/core/read-models";
+import { getLogoUrls } from "@/db/queries/logos";
 import { getFundingSummary, getSectorCounts } from "@/db/queries/summary";
 import { getWebDb } from "@/db/web";
 import { serialiseFundingFilters } from "@/lib/funding-filters";
@@ -42,5 +43,17 @@ export function cachedSectorCounts(days: number) {
   return cached(
     () => getSectorCounts(getWebDb(), { days, today }),
     ["sector-counts", String(days), today],
+  );
+}
+
+/**
+ * Logo addresses (D72) for the companies on one page, in one query. One entry
+ * per set of companies; companies with no servable logo are left out.
+ */
+export function cachedLogoUrls(companyIds: readonly number[]) {
+  const ids = [...new Set(companyIds)].sort((a, b) => a - b);
+  return cached(
+    () => getLogoUrls(getWebDb(), ids),
+    ["logo-urls", ids.join(",")],
   );
 }

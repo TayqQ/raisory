@@ -665,6 +665,8 @@ function toCompanyEvent(
 
 /** One compact item in "Companies like this": the company and its latest round. */
 export interface SimilarCompany {
+  /** For the batched logo lookup (`getLogoUrls`); never shown. */
+  companyId: number;
   slug: string;
   name: string;
   countryCode: string | null;
@@ -813,6 +815,7 @@ export async function getSimilarCompanies(
     ranked.push({
       rank: stageRank(row.roundType, roundType),
       item: {
+        companyId: row.companyId,
         slug: row.slug,
         name: row.name,
         countryCode: trimOrNull(row.countryCode),

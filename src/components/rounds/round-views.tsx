@@ -23,6 +23,7 @@ export function RoundViews({
   filters,
   appliedLabels,
   clearHref,
+  logoUrls,
   now,
 }: {
   rows: readonly FundingRow[];
@@ -31,6 +32,8 @@ export function RoundViews({
   /** The applied filters by name, as the chips show them. */
   appliedLabels: readonly string[];
   clearHref: string;
+  /** Logo addresses by company id, from one `getLogoUrls` call. */
+  logoUrls?: Readonly<Record<number, string>>;
   now?: Date;
 }) {
   if (rows.length === 0) {
@@ -66,13 +69,20 @@ export function RoundViews({
     return (
       <>
         <div className="md:hidden">
-          <RoundList rows={rows} filters={filters} now={now} />
+          <RoundList
+            rows={rows}
+            filters={filters}
+            logoUrls={logoUrls}
+            now={now}
+          />
         </div>
         <div className="max-md:hidden">
-          <RoundCards rows={rows} now={now} />
+          <RoundCards rows={rows} logoUrls={logoUrls} now={now} />
         </div>
       </>
     );
   }
-  return <RoundList rows={rows} filters={filters} now={now} />;
+  return (
+    <RoundList rows={rows} filters={filters} logoUrls={logoUrls} now={now} />
+  );
 }

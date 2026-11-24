@@ -136,6 +136,8 @@ export interface EventConfirmation {
 
 export interface FundingRow {
   eventId: number;
+  /** For the batched logo lookup (`getLogoUrls`); never shown. */
+  companyId: number;
   companySlug: string;
   companyName: string;
   countryCode: string | null;

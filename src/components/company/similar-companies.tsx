@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SECTOR_LABELS } from "@/core/sectors";
 import type { SimilarCompanies as SimilarCompaniesData } from "@/db/queries/companies";
 import { Amount } from "@/components/ui/amount";
-import { Monogram } from "@/components/ui/monogram";
+import { CompanyMark } from "@/components/ui/company-mark";
 import { PlaceBadge } from "@/components/ui/place-badge";
 import { RelativeDate } from "@/components/ui/relative-date";
 import { StageChip } from "@/components/ui/stage-chip";
@@ -14,9 +14,13 @@ import { StageChip } from "@/components/ui/stage-chip";
  */
 export function SimilarCompanies({
   similar,
+  logoUrls,
   now,
 }: {
   similar: SimilarCompaniesData | null;
+  /** Logo addresses by company id, from one `getLogoUrls` call. */
+  logoUrls?: Readonly<Record<number, string>>;
+
   now?: Date;
 }) {
   const sector = similar?.mainSector ?? null;
@@ -45,7 +49,11 @@ export function SimilarCompanies({
                 className="block h-full rounded-[var(--radius)] border border-line bg-surface p-3 transition-colors duration-[120ms] ease-out hover:bg-surface-sunk motion-reduce:transition-none"
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <Monogram name={item.name} size={28} />
+                  <CompanyMark
+                    name={item.name}
+                    logoUrl={logoUrls?.[item.companyId]}
+                    size={28}
+                  />
                   <span className="truncate text-[15px] font-semibold text-ink">
                     {item.name}
                   </span>

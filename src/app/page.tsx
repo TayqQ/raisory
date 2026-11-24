@@ -17,7 +17,12 @@ import {
 import { EMPTY_FUNDING_SUMMARY, summaryScope } from "@/db/queries/summary";
 import { listThemes } from "@/db/queries/themes";
 import { getWebDb } from "@/db/web";
-import { cached, cachedFundingSummary, cachedSectorCounts } from "@/lib/cached";
+import {
+  cached,
+  cachedFundingSummary,
+  cachedLogoUrls,
+  cachedSectorCounts,
+} from "@/lib/cached";
 import { describeFundingCriteria } from "@/lib/filter-summary";
 import {
   describeAppliedFilters,
@@ -104,6 +109,11 @@ export default async function HomePage({
       cachedSectorCounts(SECTOR_RANK_DAYS),
     ]);
 
+  // One lookup for every company shown: the list and the biggest rounds.
+  const logoUrls = await cachedLogoUrls(
+    [...page.items, ...summaryData.biggest].map((row) => row.companyId),
+  );
+
   const themeNames = Object.fromEntries(
     themes.map((theme) => [theme.slug, theme.name]),
   );
@@ -139,6 +149,7 @@ export default async function HomePage({
               filters={filters}
               scope={scope}
               periodHrefs={periodHrefs}
+              logoUrls={logoUrls}
             />
           </SummaryFrame>
 
@@ -199,6 +210,7 @@ export default async function HomePage({
               filters={filters}
               appliedLabels={appliedLabels}
               clearHref={fundingFiltersHref({}, filters)}
+              logoUrls={logoUrls}
             />
             <Pagination
               filters={filters}

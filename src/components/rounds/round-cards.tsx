@@ -1,7 +1,7 @@
 import type { FundingRow } from "@/core/read-models";
 import { Amount } from "@/components/ui/amount";
 import { ConfirmedMark } from "@/components/ui/confirmed-mark";
-import { Monogram } from "@/components/ui/monogram";
+import { CompanyMark } from "@/components/ui/company-mark";
 import { NewMark } from "@/components/ui/new-mark";
 import { PlaceBadge } from "@/components/ui/place-badge";
 import { RelativeDate } from "@/components/ui/relative-date";
@@ -22,9 +22,12 @@ import {
  */
 export function RoundCards({
   rows,
+  logoUrls,
   now,
 }: {
   rows: readonly FundingRow[];
+  /** Logo addresses by company id, from one `getLogoUrls` call. */
+  logoUrls?: Readonly<Record<number, string>>;
   now?: Date;
 }) {
   return (
@@ -34,20 +37,28 @@ export function RoundCards({
     >
       {rows.map((row) => (
         <li key={row.eventId} className="min-w-0">
-          <RoundCard row={row} now={now} />
+          <RoundCard row={row} logoUrl={logoUrls?.[row.companyId]} now={now} />
         </li>
       ))}
     </ul>
   );
 }
 
-function RoundCard({ row, now }: { row: FundingRow; now?: Date }) {
+function RoundCard({
+  row,
+  logoUrl,
+  now,
+}: {
+  row: FundingRow;
+  logoUrl?: string;
+  now?: Date;
+}) {
   const description = row.companyDescription?.trim() || null;
   const leads = leadsLabel(row);
   return (
     <article className="relative flex h-full flex-col gap-3 rounded-[var(--radius)] border border-line bg-surface p-4 transition-colors duration-[120ms] ease-out hover:border-line-strong motion-reduce:transition-none">
       <div className="flex min-w-0 items-start gap-3">
-        <Monogram name={row.companyName} size={40} />
+        <CompanyMark name={row.companyName} logoUrl={logoUrl} size={40} />
         <div className="min-w-0 flex-1">
           <h3 className="flex min-w-0 text-[15px] leading-snug">
             <RoundName row={row} />

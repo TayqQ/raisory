@@ -1,7 +1,7 @@
 import type { FundingFilters, FundingRow } from "@/core/read-models";
 import { Amount } from "@/components/ui/amount";
 import { ConfirmedMark } from "@/components/ui/confirmed-mark";
-import { Monogram } from "@/components/ui/monogram";
+import { CompanyMark } from "@/components/ui/company-mark";
 import { NewMark } from "@/components/ui/new-mark";
 import { PlaceBadge } from "@/components/ui/place-badge";
 import { RelativeDate } from "@/components/ui/relative-date";
@@ -42,11 +42,14 @@ const CELL = "px-3 py-3 max-md:min-w-0 max-md:p-0";
 export function RoundList({
   rows,
   filters,
+  logoUrls,
   now,
 }: {
   rows: readonly FundingRow[];
   /** For the sort headers. Without it the headers are plain text. */
   filters?: FundingFilters;
+  /** Logo addresses by company id, from one `getLogoUrls` call. */
+  logoUrls?: Readonly<Record<number, string>>;
   now?: Date;
 }) {
   return (
@@ -95,7 +98,12 @@ export function RoundList({
         </thead>
         <tbody className="max-md:block">
           {rows.map((row) => (
-            <RoundListRow key={row.eventId} row={row} now={now} />
+            <RoundListRow
+              key={row.eventId}
+              row={row}
+              logoUrl={logoUrls?.[row.companyId]}
+              now={now}
+            />
           ))}
         </tbody>
       </table>
@@ -103,7 +111,15 @@ export function RoundList({
   );
 }
 
-function RoundListRow({ row, now }: { row: FundingRow; now?: Date }) {
+function RoundListRow({
+  row,
+  logoUrl,
+  now,
+}: {
+  row: FundingRow;
+  logoUrl?: string;
+  now?: Date;
+}) {
   const leads = leadsLabel(row);
   const description = row.companyDescription?.trim() || null;
   return (
@@ -111,7 +127,7 @@ function RoundListRow({ row, now }: { row: FundingRow; now?: Date }) {
       <td className={`${CELL} pl-0 max-md:contents`}>
         <div className="flex min-w-0 items-start gap-2.5 max-md:contents">
           <span className="pt-px max-md:col-start-1 max-md:row-start-1">
-            <Monogram name={row.companyName} size={28} />
+            <CompanyMark name={row.companyName} logoUrl={logoUrl} size={28} />
           </span>
           <div className="min-w-0 flex-1 max-md:contents">
             <div className="flex min-w-0 items-baseline gap-2 leading-snug max-md:col-span-2 max-md:col-start-2 max-md:row-start-1 max-md:self-center">

@@ -95,7 +95,7 @@ export function ActionRow({
           <a
             href={`https://${domain}`}
             target="_blank"
-            rel="noopener"
+            rel="noopener nofollow"
             className={`${buttonClasses("primary", "sm")} shrink-0`}
           >
             <Icon name="globe" />

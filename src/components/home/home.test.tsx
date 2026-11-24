@@ -48,6 +48,7 @@ function filters(overrides: Partial<FundingFilters> = {}): FundingFilters {
 function round(name: string, gbp: number): FundingRow {
   return {
     eventId: gbp,
+    companyId: gbp,
     companySlug: name.toLowerCase().replace(/\s+/g, "-"),
     companyName: name,
     countryCode: "GB",

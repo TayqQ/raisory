@@ -14,7 +14,7 @@ import { listFundingRounds } from "@/db/queries/funding";
 import { listInvestorActivity } from "@/db/queries/investor-activity";
 import { getThemeDetail } from "@/db/queries/themes";
 import { getWebDb } from "@/db/web";
-import { cached } from "@/lib/cached";
+import { cached, cachedLogoUrls } from "@/lib/cached";
 import { formatDate, formatRoundType } from "@/lib/format";
 import { toIsoDate } from "@/lib/weeks";
 
@@ -63,6 +63,9 @@ export default async function ThemePage({ params }: Params) {
     ),
   ]);
 
+  const logoUrls = await cachedLogoUrls(
+    rounds.items.map((row) => row.companyId),
+  );
   const { summary, weekly, stageMix } = detail;
   const firstWeek = weekly[0]?.weekStart;
   const lastWeek = weekly[weekly.length - 1]?.weekStart;
@@ -148,7 +151,12 @@ export default async function ThemePage({ params }: Params) {
             Rounds appear here once collected articles have been processed.
           </EmptyState>
         ) : (
-          <RoundList rows={rounds.items} filters={filters} now={now} />
+          <RoundList
+            rows={rounds.items}
+            filters={filters}
+            logoUrls={logoUrls}
+            now={now}
+          />
         )}
         <p className="mt-3 text-sm">
           <Link

@@ -23,7 +23,7 @@ import { companySources, SourceList } from "@/components/source-list";
 import type { CompanyDetail } from "@/core/read-models";
 import { getCompanyDetail, getSimilarCompanies } from "@/db/queries/companies";
 import { getWebDb } from "@/db/web";
-import { cached } from "@/lib/cached";
+import { cached, cachedLogoUrls } from "@/lib/cached";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +75,12 @@ export default async function CompanyPage({ params }: Params) {
     permanentRedirect(`/companies/${company.redirectToSlug}`);
   }
 
+  // The company's own logo and its similar companies', in one lookup.
+  const logoUrls = await cachedLogoUrls([
+    company.id,
+    ...(similar?.items ?? []).map((item) => item.companyId),
+  ]);
+
   const now = new Date();
   const ch = company.registry?.companiesHouse ?? null;
   const countryCode = company.location?.countryCode ?? company.countryCode;
@@ -101,6 +107,8 @@ export default async function CompanyPage({ params }: Params) {
         mainSector={similar?.mainSector ?? null}
         statuses={statuses(company)}
         themes={company.themes ?? []}
+        logoUrl={logoUrls[company.id] ?? null}
+        websiteDomain={company.websiteDomain}
       />
       <ActionRow
         companyName={company.name}
@@ -161,7 +169,7 @@ export default async function CompanyPage({ params }: Params) {
         </aside>
       </div>
 
-      <SimilarCompanies similar={similar} now={now} />
+      <SimilarCompanies similar={similar} logoUrls={logoUrls} now={now} />
     </main>
   );
 }
