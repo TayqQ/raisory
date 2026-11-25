@@ -3,6 +3,7 @@ import {
   desc,
   eq,
   gte,
+  inArray,
   isNotNull,
   isNull,
   lt,
@@ -16,6 +17,7 @@ import type {
 } from "@/core/domain";
 import {
   EVENT_TYPES,
+  type IngestStatus,
   LLM_PURPOSES,
   RECORD_KINDS,
   REGISTRY_KINDS,
@@ -85,6 +87,7 @@ export interface Phase2Status {
 
 /** `StatusSummary` with the Phase 3 blocks filled in, plus the Phase 2 block. */
 export type StatusReport = StatusSummary & {
+  ingestHealth: IngestHealth;
   phase2: Phase2Status;
   registry: RegistryStatus;
   formD: FormDStatus;
@@ -95,6 +98,164 @@ export type StatusReport = StatusSummary & {
 const PROFILE_STALE_DAYS = 90;
 
 const RECENT_RUN_LIMIT = 10;
+
+/**
+ * Hours without a successful news ingest before the status page and
+ * `pnpm ingest health` call ingest behind (D73).
+ */
+export const INGEST_STALE_AFTER_HOURS = 8;
+
+/**
+ * A `running` row older than this belongs to a job that died; the next run
+ * closes it as failed (D67). Younger ones are shown as in progress.
+ */
+export const RUN_IN_PROGRESS_MAX_MINUTES = 60;
+
+/**
+ * Statuses that count as a successful news ingest. A budget pause still
+ * collected and stored the feeds; it only held back paid extraction.
+ */
+export const NEWS_SUCCESS_STATUSES = [
+  "succeeded",
+  "budget_paused",
+] as const satisfies readonly IngestStatus[];
+
+/**
+ * True for a row written by the hourly news run (`pnpm ingest run`), on any
+ * trigger. Only that run records a `collect` step time in `stats.stepMs`;
+ * the daily runs carry zeroed `collect` stats too, so those do not tell them
+ * apart. A row whose stats are null (still running, or the run threw) is not
+ * recognised. Keep in step with `NEWS_RUN_SQL`.
+ */
+export function isNewsIngestRun(run: Pick<IngestRunSummary, "stats">): boolean {
+  const stepMs: unknown = (run.stats as { stepMs?: unknown } | null)?.stepMs;
+  return (
+    stepMs != null &&
+    typeof stepMs === "object" &&
+    !Array.isArray(stepMs) &&
+    Object.hasOwn(stepMs, "collect")
+  );
+}
+
+/**
+ * The one definition of "news ingest succeeded", used by the status page and
+ * the health check (D73). Keep in step with `NEWS_SUCCESS_SQL`.
+ */
+export function isNewsIngestSuccess(
+  run: Pick<IngestRunSummary, "status" | "stats">,
+): boolean {
+  return (
+    isNewsIngestRun(run) &&
+    (NEWS_SUCCESS_STATUSES as readonly IngestStatus[]).includes(run.status)
+  );
+}
+
+const NEWS_RUN_SQL = sql`(${ingestRuns.stats} -> 'stepMs') ? 'collect'`;
+const NEWS_SUCCESS_SQL = and(
+  NEWS_RUN_SQL,
+  inArray(ingestRuns.status, [...NEWS_SUCCESS_STATUSES]),
+);
+
+/** When a successful run counts from: its finish, else its start. */
+export function successTime(
+  run: Pick<IngestRunSummary, "startedAt" | "finishedAt">,
+): string {
+  return run.finishedAt ?? run.startedAt;
+}
+
+/**
+ * True when the last success is older than `maxAgeHours`, or there is none.
+ * Exactly `maxAgeHours` old is still fresh.
+ */
+export function isIngestStale(
+  lastSuccessAt: string | null,
+  now: Date,
+  maxAgeHours: number = INGEST_STALE_AFTER_HOURS,
+): boolean {
+  if (lastSuccessAt == null) return true;
+  const at = new Date(lastSuccessAt).getTime();
+  if (Number.isNaN(at)) return true;
+  return now.getTime() - at > maxAgeHours * 60 * 60 * 1000;
+}
+
+const UK_DATE_TIME = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/London",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** "25 Nov 2026, 17:09", in UK time (GMT or BST). */
+export function formatUkDateTime(iso: string): string {
+  return UK_DATE_TIME.format(new Date(iso));
+}
+
+/** News ingest state for the status page and the health check. */
+export interface IngestHealth {
+  /** Newest news run, whatever its status. */
+  latestNewsRun: IngestRunSummary | null;
+  /** Newest news run that passes `isNewsIngestSuccess`. */
+  lastNewsSuccess: IngestRunSummary | null;
+  /**
+   * Newest `running` row of any kind started within
+   * `RUN_IN_PROGRESS_MAX_MINUTES`. A run writes its stats only when it
+   * finishes, so a running news run cannot be told from a daily one: show
+   * this as "a run", never as a news run.
+   */
+  runInProgress: IngestRunSummary | null;
+}
+
+type IngestRunRow = typeof ingestRuns.$inferSelect;
+
+function toRunSummary(run: IngestRunRow): IngestRunSummary {
+  return {
+    id: run.id,
+    startedAt: requiredTimestamp(run.startedAt),
+    finishedAt: isoTimestamp(run.finishedAt),
+    trigger: run.trigger,
+    status: run.status,
+    stats: asStats(run.stats),
+    error: run.error,
+  };
+}
+
+async function newestRun(db: Db, where: SQL | undefined) {
+  const [run] = await db
+    .select()
+    .from(ingestRuns)
+    .where(where)
+    .orderBy(desc(ingestRuns.startedAt), desc(ingestRuns.id))
+    .limit(1);
+  return run ? toRunSummary(run) : null;
+}
+
+/**
+ * Reads the news runs directly rather than from the recent-runs list, which
+ * daily and manual runs can fill (D73).
+ */
+export async function getIngestHealth(
+  db: Db,
+  now: Date = new Date(),
+): Promise<IngestHealth> {
+  const inProgressSince = new Date(
+    now.getTime() - RUN_IN_PROGRESS_MAX_MINUTES * 60_000,
+  );
+  const [latestNewsRun, lastNewsSuccess, runInProgress] = await Promise.all([
+    newestRun(db, NEWS_RUN_SQL),
+    newestRun(db, NEWS_SUCCESS_SQL),
+    newestRun(
+      db,
+      and(
+        eq(ingestRuns.status, "running"),
+        gte(ingestRuns.startedAt, inProgressSince),
+      ),
+    ),
+  ]);
+  return { latestNewsRun, lastNewsSuccess, runInProgress };
+}
 
 function asCount(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -450,6 +611,7 @@ export async function getStatusSummary(
     registry,
     formD,
     confirmations,
+    ingestHealth,
   ] = await Promise.all([
     db
       .select()
@@ -477,6 +639,7 @@ export async function getStatusSummary(
     getRegistryStatus(db, now),
     getFormDStatus(db),
     getConfirmationStatus(db),
+    getIngestHealth(db, now),
   ]);
 
   const itemCountsByStatus = zeroCounts(SOURCE_ITEM_STATUSES);
@@ -489,15 +652,7 @@ export async function getStatusSummary(
     eventCountsByType[row.type] = asCount(row.count);
   }
 
-  const recentRuns: IngestRunSummary[] = runs.map((run) => ({
-    id: run.id,
-    startedAt: requiredTimestamp(run.startedAt),
-    finishedAt: isoTimestamp(run.finishedAt),
-    trigger: run.trigger,
-    status: run.status,
-    stats: asStats(run.stats),
-    error: run.error,
-  }));
+  const recentRuns: IngestRunSummary[] = runs.map(toRunSummary);
 
   return {
     recentRuns,
@@ -506,6 +661,7 @@ export async function getStatusSummary(
     monthToDateUsdMicros: monthToDate,
     capGbp: capOf(recentRuns[0]?.stats ?? null),
     usdPerGbp: usdPerEur && gbpPerEur ? usdPerEur / gbpPerEur : null,
+    ingestHealth,
     phase2,
     registry,
     formD,

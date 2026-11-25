@@ -1,5 +1,12 @@
 import { parseArgs } from "node:util";
 import { INGEST_TRIGGERS, type IngestTrigger } from "@/core/enums";
+import { parseWebEnv } from "@/core/env";
+import { createWebDb, type Db } from "@/db/client";
+import {
+  checkIngestHealth,
+  closeWebDb,
+  redactConnectionStrings,
+} from "@/pipeline/health/check";
 import { withIngestLock } from "@/pipeline/lock";
 import {
   collectStep,
@@ -63,6 +70,10 @@ Commands:
   embed      Embed tags that have no embedding from the current model
   themes     Assign embedded tags to themes, then name new themes
   stats      Rebuild company locations and the derived stats tables
+  health     Read-only: print one line on the last successful news ingest.
+             Exits 0 when it is recent, 1 when stale, 2 when the check
+             itself failed. Needs only DATABASE_URL (the read-only web role
+             is enough); takes no lock and does not read .env
 
 Options:
   --trigger schedule|manual   run, enrich, grants, websites, registry, formd: recorded on the run
@@ -85,6 +96,8 @@ Options:
   --max-days <n>              formd: most index days (default
                               MAX_EDGAR_DAYS_PER_RUN)
   --force                     stats: rebuild even when nothing has changed
+  --max-age-hours <n>         health: hours since the last success before it
+                              counts as stale (default 8)
   -h, --help                  Show this help
 
 Without OPENAI_API_KEY, run still collects and rebuilds stats, and enrich
@@ -123,6 +136,38 @@ function print(value: unknown): void {
   console.log(JSON.stringify(value));
 }
 
+/**
+ * `pnpm ingest health` (D73). Runs before `.env` is loaded and before the
+ * pipeline is wired: it reads DATABASE_URL alone, through the web client, so
+ * it needs no lock, no contact and no write access.
+ */
+async function runHealth(maxAgeFlag: string | undefined): Promise<number> {
+  let db: Db | null = null;
+  try {
+    const maxAgeHours = positiveInt(maxAgeFlag, "--max-age-hours");
+    const { DATABASE_URL } = parseWebEnv({
+      DATABASE_URL: process.env.DATABASE_URL,
+    });
+    db = createWebDb(DATABASE_URL);
+    const result = await checkIngestHealth(db, {
+      now: new Date(),
+      maxAgeHours,
+    });
+    console.log(result.line);
+    return result.healthy ? 0 : 1;
+  } catch (error) {
+    let message = error instanceof Error ? error.message : String(error);
+    // Drizzle wraps the driver's error; its cause says what went wrong.
+    if (error instanceof Error && error.cause instanceof Error) {
+      message += ` (${error.cause.message})`;
+    }
+    console.error(`Health check failed: ${redactConnectionStrings(message)}`);
+    return 2;
+  } finally {
+    if (db) await closeWebDb(db).catch(() => undefined);
+  }
+}
+
 async function main(): Promise<number> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
@@ -140,6 +185,7 @@ async function main(): Promise<number> {
       "max-fetches": { type: "string" },
       "max-days": { type: "string" },
       force: { type: "boolean", default: false },
+      "max-age-hours": { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -149,6 +195,7 @@ async function main(): Promise<number> {
     console.log(USAGE);
     return values.help ? 0 : 1;
   }
+  if (command === "health") return runHealth(values["max-age-hours"]);
   if (!(INGEST_TRIGGERS as readonly string[]).includes(values.trigger)) {
     console.error(`Unknown trigger: ${values.trigger}`);
     return 1;

@@ -18,7 +18,13 @@ import {
 } from "@/core/enums";
 import type { IngestRunSummary } from "@/core/read-models";
 import {
+  formatUkDateTime,
   getStatusSummary,
+  INGEST_STALE_AFTER_HOURS,
+  isIngestStale,
+  isNewsIngestRun,
+  successTime,
+  type IngestHealth,
   type Phase2Status,
   type StatusReport,
 } from "@/db/queries/status";
@@ -43,10 +49,19 @@ const FALLBACK_USD_PER_GBP = 1;
 
 export const dynamic = "force-dynamic";
 
-function loadStatus(): Promise<StatusReport> {
-  return cached(() => getStatusSummary(getWebDb()), ["status-summary"], {
-    revalidateSeconds: 60,
-  });
+/**
+ * The minute is part of the cache key. With one fixed key, the first visit
+ * after a quiet spell was served the entry from the visit before, however
+ * old, while it refreshed in the background (D73). Visits within the same
+ * minute still share one read.
+ */
+function loadStatus(now: Date): Promise<StatusReport> {
+  const minute = String(Math.floor(now.getTime() / 60_000));
+  return cached(
+    () => getStatusSummary(getWebDb(), now),
+    ["status-summary", minute],
+    { revalidateSeconds: 60 },
+  );
 }
 
 function formatUtcDateTime(iso: string): string {
@@ -146,6 +161,32 @@ function formatEventType(type: EventType): string {
       return exhaustive;
     }
   }
+}
+
+/** What a run did, read from the steps its stats carry. Display only. */
+function runKind(run: IngestRunSummary): string {
+  const stats = run.stats as
+    (Record<string, unknown> & { stepMs?: unknown }) | null;
+  if (stats == null) return "—";
+  if (isNewsIngestRun(run)) return "News";
+  if ("grantCollect" in stats) return "Grants";
+  if ("registry" in stats) return "Registry";
+  if ("websites" in stats) return "Websites";
+  if ("formD" in stats) return "Form D";
+  if ("stepMs" in stats || "embed" in stats || "themes" in stats) {
+    return "Enrich";
+  }
+  return "Other";
+}
+
+function StatusBadge({ status }: { status: IngestStatus }) {
+  return (
+    <span
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(status)}`}
+    >
+      {formatIngestStatus(status)}
+    </span>
+  );
 }
 
 function statusBadgeClass(status: IngestStatus): string {
@@ -551,6 +592,7 @@ function RunsTable({ runs }: { runs: IngestRunSummary[] }) {
         <thead className="bg-surface-sunk text-muted">
           <tr>
             <th className="px-3 py-2 font-medium">Started (UTC)</th>
+            <th className="px-3 py-2 font-medium">Kind</th>
             <th className="px-3 py-2 font-medium">Duration</th>
             <th className="px-3 py-2 font-medium">Status</th>
             <th className="px-3 py-2 font-medium text-right">Collected</th>
@@ -571,15 +613,14 @@ function RunsTable({ runs }: { runs: IngestRunSummary[] }) {
                 <td className="whitespace-nowrap px-3 py-2">
                   {formatUtcDateTime(run.startedAt)}
                 </td>
+                <td data-label="Kind" className="px-3 py-2">
+                  {runKind(run)}
+                </td>
                 <td data-label="Duration" className="px-3 py-2">
                   {duration ?? "—"}
                 </td>
                 <td data-label="Status" className="px-3 py-2">
-                  <span
-                    className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(run.status)}`}
-                  >
-                    {formatIngestStatus(run.status)}
-                  </span>
+                  <StatusBadge status={run.status} />
                 </td>
                 <td
                   data-label="Collected"
@@ -605,6 +646,68 @@ function RunsTable({ runs }: { runs: IngestRunSummary[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function StaleBanner({ health }: { health: IngestHealth }) {
+  const success = health.lastNewsSuccess;
+  return (
+    <div
+      className="mt-6 rounded-lg border border-warn bg-warn-soft px-4 py-3 text-warn"
+      role="status"
+    >
+      <p className="font-medium">
+        {success
+          ? `Ingest is behind: last success ${formatUkDateTime(successTime(success))} UK time`
+          : "Ingest is behind: no successful news ingest recorded"}
+      </p>
+      <p className="mt-1 text-sm">
+        No news ingest has succeeded in the last {INGEST_STALE_AFTER_HOURS}{" "}
+        hours, so new funding news is not reaching the site.
+        {health.runInProgress
+          ? ` A run started at ${formatUkDateTime(health.runInProgress.startedAt)} UK time is still running; its kind is not known until it finishes, so it may be a daily run.`
+          : ""}
+      </p>
+    </div>
+  );
+}
+
+function NewsIngestSection({ health }: { health: IngestHealth }) {
+  const latest = health.latestNewsRun;
+  const success = health.lastNewsSuccess;
+  const cards = [
+    {
+      label: "Latest news run (started)",
+      time: latest ? formatUkDateTime(latest.startedAt) : "None yet",
+      status: latest?.status ?? null,
+    },
+    {
+      label: "Last success (finished)",
+      time: success ? formatUkDateTime(successTime(success)) : "None yet",
+      status: null,
+    },
+  ];
+  return (
+    <section className="mt-10">
+      <h2 className="text-xl font-semibold">News ingest</h2>
+      <p className="mt-1 text-sm text-muted">
+        The hourly run that collects the feeds. Times are UK time.
+      </p>
+      <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {cards.map((card) => (
+          <div
+            key={card.label}
+            className="rounded-lg border border-line bg-surface-sunk px-3 py-2"
+          >
+            <dt className="text-xs text-muted">{card.label}</dt>
+            <dd className="mt-0.5 flex flex-wrap items-center gap-2 text-ink">
+              <span className="font-semibold tabular-nums">{card.time}</span>
+              {card.status ? <StatusBadge status={card.status} /> : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
@@ -639,9 +742,16 @@ function CountGrid({
 }
 
 export default async function StatusPage() {
-  const summary = await loadStatus();
-  const latest = summary.recentRuns[0];
+  const now = new Date();
+  const summary = await loadStatus(now);
+  const health = summary.ingestHealth;
+  // The banners below are about the news run, not whichever run was last.
+  const latest = health.latestNewsRun;
   const budgetPaused = latest?.status === "budget_paused";
+  const stale = isIngestStale(
+    health.lastNewsSuccess ? successTime(health.lastNewsSuccess) : null,
+    now,
+  );
   const empty = summary.recentRuns.length === 0;
 
   const itemLabels = Object.fromEntries(
@@ -657,8 +767,10 @@ export default async function StatusPage() {
       <h1 className="sr-only">Status</h1>
       <p className="text-[13px] text-muted">
         Ingestion health, item and event counts, and language-model spend
-        against the monthly cap. Cached for about 60 seconds.
+        against the monthly cap. Cached for up to a minute.
       </p>
+
+      {stale ? <StaleBanner health={health} /> : null}
 
       {budgetPaused ? (
         <div
@@ -667,9 +779,9 @@ export default async function StatusPage() {
         >
           <p className="font-medium">Budget paused</p>
           <p className="mt-1 text-sm">
-            The latest ingest run hit the monthly LLM spend cap. New extractions
-            are paused until the next calendar month or the cap is raised;
-            pending items stay in the queue.
+            The latest news ingest run hit the monthly LLM spend cap. New
+            extractions are paused until the next calendar month or the cap is
+            raised; pending items stay in the queue.
           </p>
         </div>
       ) : null}
@@ -709,10 +821,15 @@ export default async function StatusPage() {
         </div>
       ) : (
         <>
+          <NewsIngestSection health={health} />
+
           <section className="mt-10">
             <h2 className="text-xl font-semibold">Recent ingest runs</h2>
             <p className="mt-1 text-sm text-muted">
               Last {summary.recentRuns.length} runs, newest first.
+              {health.runInProgress
+                ? ` A run of some kind started at ${formatUkDateTime(health.runInProgress.startedAt)} UK time is still running; its kind shows once it finishes.`
+                : ""}
             </p>
             <RunsTable runs={summary.recentRuns} />
           </section>

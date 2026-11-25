@@ -28,7 +28,12 @@ import {
   themes,
 } from "../schema";
 import { createTestDb, type TestDb } from "../testing";
-import { getStatusSummary } from "./status";
+import {
+  getIngestHealth,
+  getStatusSummary,
+  isNewsIngestRun,
+  isNewsIngestSuccess,
+} from "./status";
 
 // Wednesday 11 November 2026.
 const NOW = new Date("2026-11-11T12:00:00.000Z");
@@ -594,5 +599,128 @@ describe("getStatusSummary Phase 3 blocks", () => {
       sec_form_d: 1,
     });
     expect(confirmations.newsEventsConfirmed).toBe(3);
+  });
+});
+
+// Only the hourly news run records a `collect` step time (D73).
+const NEWS_STATS = {
+  collect: { feedsFetched: 3 },
+  stepMs: { collect: 1200, extract: 300 },
+} as unknown as IngestStats;
+// Daily runs carry zeroed collect stats, and enrich has its own step times.
+const DAILY_STATS = { collect: { feedsFetched: 0 } } as unknown as IngestStats;
+const ENRICH_STATS = {
+  collect: { feedsFetched: 0 },
+  stepMs: { embed: 900, themes: 400 },
+} as unknown as IngestStats;
+
+function hoursBefore(now: Date, hours: number): Date {
+  return new Date(now.getTime() - hours * 60 * 60 * 1000);
+}
+
+describe("news ingest health", () => {
+  let testDb: TestDb;
+  let db: Db;
+
+  beforeAll(async () => {
+    testDb = await createTestDb();
+    db = testDb.db;
+  }, 60_000);
+
+  afterAll(async () => {
+    await testDb.close();
+  });
+
+  it("finds the newest news run when later daily runs fill the recent list", async () => {
+    // The cause in D73: 24 Nov had nine daily and manual runs in a row, so
+    // the first recent run was not a news run.
+    const [news] = await db
+      .insert(ingestRuns)
+      .values({
+        trigger: "schedule",
+        status: "succeeded",
+        startedAt: hoursBefore(NOW, 12),
+        finishedAt: hoursBefore(NOW, 11.9),
+        stats: NEWS_STATS,
+      })
+      .returning();
+    if (!news) throw new Error("news run not seeded");
+    await db.insert(ingestRuns).values(
+      Array.from({ length: 10 }, (_, i) => ({
+        trigger: "manual" as const,
+        status: "succeeded" as const,
+        startedAt: hoursBefore(NOW, 10 - i * 0.5),
+        finishedAt: hoursBefore(NOW, 10 - i * 0.5 - 0.1),
+        stats: i % 2 === 0 ? DAILY_STATS : ENRICH_STATS,
+      })),
+    );
+
+    const summary = await getStatusSummary(db, NOW);
+    expect(summary.recentRuns).toHaveLength(10);
+    expect(summary.recentRuns.some(isNewsIngestRun)).toBe(false);
+    expect(summary.ingestHealth.latestNewsRun?.id).toBe(news.id);
+    expect(summary.ingestHealth.lastNewsSuccess?.id).toBe(news.id);
+    expect(summary.ingestHealth.lastNewsSuccess?.finishedAt).toBe(
+      hoursBefore(NOW, 11.9).toISOString(),
+    );
+    expect(summary.ingestHealth.runInProgress).toBeNull();
+
+    await db.delete(ingestRuns);
+  });
+
+  it("shows a running row started within the hour as in progress", async () => {
+    await db.insert(ingestRuns).values([
+      // Abandoned: older than an hour, so the next run closes it.
+      {
+        trigger: "schedule",
+        status: "running",
+        startedAt: hoursBefore(NOW, 2),
+      },
+      {
+        trigger: "schedule",
+        status: "running",
+        startedAt: hoursBefore(NOW, 0.2),
+      },
+    ]);
+    const health = await getIngestHealth(db, NOW);
+    expect(health.runInProgress?.status).toBe("running");
+    expect(health.runInProgress?.startedAt).toBe(
+      hoursBefore(NOW, 0.2).toISOString(),
+    );
+    // Its stats are null until it finishes, so it is not yet a news run.
+    expect(health.latestNewsRun).toBeNull();
+    expect(health.lastNewsSuccess).toBeNull();
+
+    await db.delete(ingestRuns);
+  });
+
+  it("agrees with isNewsIngestSuccess on every kind of row", async () => {
+    const rows = [
+      { status: "succeeded", stats: NEWS_STATS },
+      { status: "succeeded", stats: DAILY_STATS },
+      { status: "budget_paused", stats: NEWS_STATS },
+      { status: "succeeded", stats: ENRICH_STATS },
+      { status: "failed", stats: NEWS_STATS },
+      { status: "failed", stats: null },
+      { status: "running", stats: null },
+      { status: "succeeded", stats: { stepMs: [] } as unknown as IngestStats },
+      { status: "succeeded", stats: NEWS_STATS },
+      { status: "budget_paused", stats: DAILY_STATS },
+    ] as const;
+    for (const [i, row] of rows.entries()) {
+      await db.insert(ingestRuns).values({
+        trigger: i % 2 === 0 ? "schedule" : "manual",
+        status: row.status,
+        startedAt: hoursBefore(NOW, 20 - i),
+        stats: row.stats,
+      });
+      const all = (await getStatusSummary(db, NOW)).recentRuns;
+      const expected = all.find(isNewsIngestSuccess) ?? null;
+      const health = await getIngestHealth(db, NOW);
+      expect(health.lastNewsSuccess?.id ?? null).toBe(expected?.id ?? null);
+      expect(health.latestNewsRun?.id ?? null).toBe(
+        all.find(isNewsIngestRun)?.id ?? null,
+      );
+    }
   });
 });

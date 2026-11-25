@@ -228,6 +228,29 @@ The hourly summary's "Held: placeholder name" row counts events whose company na
 
 The reader checks each publisher host's `robots.txt` before fetching a feed (D68). A disallowed feed is skipped, logged as `Feed <slug> skipped: disallowed by robots.txt`, and counted under "Feeds skipped (robots.txt)" in the run summary, not under "Feeds failed". Tech.eu and UKTN currently disallow their feeds, so expect 2 skipped feeds a run until they give permission. A host whose `robots.txt` answers 5xx or times out is skipped for that run only. The check needs no setting.
 
+## 11. Ingest health alert
+
+The **Ingest health** workflow (`.github/workflows/health.yml`, D73) runs in the private repo every 3 hours at minute 41, and on demand from the Actions tab. It runs `pnpm ingest health`, which checks that a news ingest (`pnpm ingest run`) has succeeded in the last 8 hours.
+
+- **Stale** (no success in 8 hours): it opens one issue titled "Ingest stale" with the label `ingest-stale` (created on first use), or comments on the one already open, at most once every 12 hours. GitHub emails the repo's watchers.
+- **Recovered** (a success under 4 hours old): it closes the open issue with a "Recovered" comment.
+- **In between** (last success 4 to 8 hours old): it leaves an open issue alone, so the issue does not close and reopen on every late run.
+- **Check failed** (no secret, database unreachable, a broken install): the job fails, and GitHub reports the failed scheduled run.
+
+Setup, once:
+
+1. **[maintainer]** In the private repo, add the secret `DATABASE_URL_WEB`: the pooled URL with the `signalfeed_web` role, the same value as the site's `DATABASE_URL` on Vercel. The check only reads and takes no lock, so it does not need the ingest role.
+2. **[maintainer]** Watch the private repo (at least "Issues"), so the alert reaches you by email and on your phone.
+3. **[maintainer]** Run **Ingest health** once by hand and check that the step summary shows a line starting `Ingest healthy` or `Ingest stale`.
+
+To run the check yourself, read-only:
+
+```bash
+DATABASE_URL="<pooled web role url>" pnpm ingest health --max-age-hours 8
+```
+
+It does not read `.env`, so pass `DATABASE_URL` in the environment. It prints one line and exits 0 when healthy, 1 when stale and 2 when the check failed. The status page shows the same answer as an "Ingest is behind" banner.
+
 ## Limits to keep in mind
 
 - **Neon Free:** 1 GB of storage and 100 CU-hours a month. Measured growth is about 10 MB a month, and hourly runs fit the allowance.
