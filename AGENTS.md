@@ -1,6 +1,6 @@
 # AGENTS.md
 
-SignalFeed collects startup news, extracts structured facts with an LLM, merges them into companies and events, and shows them on a read-only website. Spec: `docs/spec.md`. Decisions: `docs/decisions.md`.
+Raisory collects startup news, extracts structured facts with an LLM, merges them into companies and events, and shows them on a read-only website. Spec: `docs/spec.md`. Decisions: `docs/decisions.md`.
 
 ## Stack
 - TypeScript (strict), Node LTS, pnpm
@@ -29,7 +29,7 @@ SignalFeed collects startup news, extracts structured facts with an LLM, merges 
 - `src/app/`, `src/components/`: web UI
 - `fixtures/`: test and eval fixtures (synthetic feeds, extraction cases)
 - `drizzle/`: generated migrations, never edited by hand once merged
-- `docs/tasks/`: one file per task
+- `private/tasks/`: one file per planned or in-flight task. `docs/tasks/`: task files for work already built
 - `private/`: if this folder exists, `private/README.md` lists the plans and notes kept there
 
 ## Conventions
@@ -46,7 +46,7 @@ SignalFeed collects startup news, extracts structured facts with an LLM, merges 
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
 
 ## Task rules
-- Work from one task file in `docs/tasks/`. Read only the files it lists, plus this file.
+- Work from one task file in `private/tasks/` (or `docs/tasks/` for built work). Read only the files it lists, plus this file.
 - **Edit only the files your task lists under "Files you may create or change".** If you need another file, stop and explain why instead of editing it.
 - Do not add dependencies unless your task says so.
 - Finish with `pnpm check` (and `pnpm build` if you touched `src/app` or config) passing, and report the commands you ran.

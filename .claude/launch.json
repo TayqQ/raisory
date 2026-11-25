@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "raisory",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "./node_modules/next/dist/bin/next",
+        "dev",
+        ".",
+        "--port",
+        "3111"
+      ],
+      "port": 3111
+    },
+    {
+      "name": "raisory-live",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "./node_modules/next/dist/bin/next",
+        "dev",
+        ".",
+        "--port",
+        "3115"
+      ],
+      "port": 3115
+    },
+    {
+      "name": "raisory-brand",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["../../Projects/.claude/serve-design.mjs"],
+      "port": 8765
+    }
+  ]
+}
