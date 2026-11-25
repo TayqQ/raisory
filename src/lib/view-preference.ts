@@ -10,7 +10,7 @@
 export const LIST_VIEWS = ["list", "cards"] as const;
 export type ListView = (typeof LIST_VIEWS)[number];
 
-export const DEFAULT_LIST_VIEW: ListView = "list";
+export const DEFAULT_LIST_VIEW: ListView = "cards";
 
 export const VIEW_COOKIE = "raisory_view";
 export const SUMMARY_COOKIE = "raisory_summary";
@@ -32,7 +32,7 @@ export function parseListView(value: unknown): ListView | undefined {
   return LIST_VIEWS.find((view) => view === lower);
 }
 
-/** The view to render: a valid `?view=` first, then a valid cookie, then List. */
+/** The view to render: a valid `?view=` first, then a valid cookie, then Cards. */
 export function resolveListView({
   param,
   cookie,
@@ -77,7 +77,7 @@ export function summaryCookie(state: SummaryState): string {
 }
 
 /**
- * `href` (path plus query) with the view set: List, the default, drops the
+ * `href` (path plus query) with the view set: Cards, the default, drops the
  * parameter, so the plain URL stays canonical. Paging and filters are kept.
  */
 export function withViewParam(href: string, view: ListView): string {

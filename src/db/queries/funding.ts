@@ -59,7 +59,11 @@ import {
   themes,
 } from "../schema";
 
-const DEFAULT_PAGE_SIZE = 25;
+/**
+ * 24 fills the card grid's 1, 2, 3 and 4 columns evenly, so a full page never
+ * leaves one card alone on its last row.
+ */
+const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 

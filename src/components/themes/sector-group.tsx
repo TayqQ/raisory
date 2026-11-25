@@ -9,7 +9,7 @@ function companiesLabel(count: number): string {
 
 /**
  * One sector on the themes page, as a native `<details>` so it folds without
- * JavaScript. It is open by default. The summary shows the sector's distinct
+ * JavaScript. It starts folded. The summary shows the sector's distinct
  * companies, which is not the sum of the theme counts below it.
  */
 export function SectorGroup({
@@ -25,7 +25,7 @@ export function SectorGroup({
   themes: readonly ThemeSummary[];
 }): ReactNode {
   return (
-    <details id={id} open className="group mt-8">
+    <details id={id} className="motion-details group mt-8">
       <summary className="flex cursor-pointer list-none items-baseline gap-2 border-b-2 border-ink pb-1 [&::-webkit-details-marker]:hidden">
         <span
           aria-hidden="true"

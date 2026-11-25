@@ -100,10 +100,26 @@ export function SummaryProvider({
   );
 }
 
-/** The summary itself: rendered on the server, and off the page when closed. */
+/**
+ * The summary itself, rendered on the server. Closing folds it away (its
+ * height and opacity ease out; see `.motion-collapse` in globals.css) and
+ * then takes it out of the tab order and the accessibility tree. The gap
+ * below it lives inside the fold, so nothing is left behind when closed.
+ */
 export function SummaryFrame({ children }: { children: ReactNode }) {
   const { visible } = useContext(SummaryContext);
-  return <div hidden={!visible}>{children}</div>;
+  return (
+    <div
+      className="motion-collapse"
+      data-open={visible}
+      inert={!visible}
+      aria-hidden={visible ? undefined : true}
+    >
+      <div className="min-h-0 overflow-hidden">
+        <div className="pb-6">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 /** The panel's close button, in its header: "Hide summary", in words. */

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { AcquisitionRow } from "@/core/read-models";
 import { formatDate, formatMoneyShort } from "@/lib/format";
 import { median } from "@/lib/trend-stats";
+import { PageNav } from "./pagination";
 import { RankedBars } from "./ui/ranked-bars";
 
 /**
@@ -251,7 +252,7 @@ export function AcquisitionsTable({
   );
 }
 
-/** Previous and next links that keep the other filters. */
+/** First, Previous, Next and Last links that keep the other filters. */
 export function AcquisitionsPager({
   page,
   pageSize,
@@ -264,30 +265,5 @@ export function AcquisitionsPager({
   hrefFor: (page: number) => string;
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  if (pages <= 1) return null;
-  const linkClass = "underline underline-offset-4 hover:text-brand";
-  return (
-    <nav
-      aria-label="Pages"
-      className="mt-4 flex items-center justify-between text-sm text-muted"
-    >
-      {page > 1 ? (
-        <Link rel="prev" href={hrefFor(page - 1)} className={linkClass}>
-          Previous
-        </Link>
-      ) : (
-        <span />
-      )}
-      <span className="tabular-nums">
-        Page {page} of {pages}
-      </span>
-      {page < pages ? (
-        <Link rel="next" href={hrefFor(page + 1)} className={linkClass}>
-          Next
-        </Link>
-      ) : (
-        <span />
-      )}
-    </nav>
-  );
+  return <PageNav page={page} pages={pages} hrefFor={hrefFor} />;
 }

@@ -51,6 +51,20 @@ export function chipLabel(roundLabel: string | null): string | undefined {
 export const NO_DESCRIPTION = "No description yet";
 
 /**
+ * How a round's card or row moves when the list changes in a transition
+ * (filters, sort, paging): one that stays glides to its new place, one that
+ * leaves fades out and one that arrives fades in. Other transitions leave it
+ * alone. The animations are in globals.css, on transform and opacity only.
+ */
+export const ROUND_MOTION = {
+  default: "none",
+  update: "round-move",
+  share: "round-move",
+  enter: "round-enter",
+  exit: "round-exit",
+} as const;
+
+/**
  * The company name as a link that covers its whole row or card (the parent
  * must be `relative`), so the row is one big target with one tab stop.
  */

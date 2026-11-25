@@ -53,7 +53,7 @@ describe("parseFundingFilters", () => {
       sort: "amount",
       direction: "asc",
       page: 2,
-      pageSize: 25,
+      pageSize: 24,
     });
 
     const again = parseFundingFilters(
@@ -332,7 +332,7 @@ describe("Phase 3 parameters (version 3)", () => {
     expect(
       serialiseFundingFilters({
         page: 2,
-        pageSize: 25,
+        pageSize: 24,
         companySizes: ["micro"],
         evidence: "confirmed",
         momentum: "first",
@@ -451,7 +451,7 @@ describe("criteria and view", () => {
       page: 2,
       pageSize: 50,
     });
-    expect(parseFundingView({})).toEqual({ page: 1, pageSize: 25 });
+    expect(parseFundingView({})).toEqual({ page: 1, pageSize: 24 });
   });
 
   it("keeps Phase 1 URLs meaning the same criteria", () => {

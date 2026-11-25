@@ -81,7 +81,7 @@ async function addTheme(db: Db, slug: string, sector: string): Promise<number> {
 }
 
 function filters(overrides: Partial<FundingFilters> = {}): FundingFilters {
-  return { page: 1, pageSize: 25, ...overrides };
+  return { page: 1, pageSize: 24, ...overrides };
 }
 
 describe("previousWindow", () => {

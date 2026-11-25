@@ -33,7 +33,7 @@ export function ChartFigure({
       {children}
       {legend}
       <figcaption className="mt-2 text-sm text-muted">{summary}</figcaption>
-      <details className="mt-2 text-sm">
+      <details className="motion-details mt-2 text-sm">
         <summary className="cursor-pointer text-brand">Show data</summary>
         <div className="mt-2 max-h-80 overflow-auto">
           <table className="w-full border-collapse text-left tabular-nums">

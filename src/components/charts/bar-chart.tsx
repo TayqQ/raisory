@@ -1,26 +1,16 @@
-import { formatAxisValue, linearScale } from "@/lib/chart-scale";
+import { formatAxisValue } from "@/lib/chart-scale";
 import { ChartFigure, EmptyChart } from "./chart-figure";
-
-const WIDTH = 480;
-const ROW_HEIGHT = 38;
-const LABEL_BASELINE = 14;
-const BAR_TOP = 21;
-const BAR_HEIGHT = 11;
-const FONT_SIZE = 13;
-const MAX_LABEL = 40;
 
 export interface BarItem {
   label: string;
   value: number;
 }
 
-function truncate(text: string): string {
-  return text.length > MAX_LABEL ? `${text.slice(0, MAX_LABEL - 1)}…` : text;
-}
-
 /**
  * Horizontal bars with the label above each bar and the value at the right.
  * Every bar has its value written next to it, so length is never the only cue.
+ * Built from HTML at the page's own text size (13 px), so it reads the same
+ * at any width; long labels are cut short with an ellipsis.
  */
 export function BarChart({
   title,
@@ -29,7 +19,7 @@ export function BarChart({
   valueLabel = "Count",
   formatValue = (n) => formatAxisValue(n),
 }: {
-  /** Accessible name of the SVG. */
+  /** Accessible name of the chart. */
   title: string;
   /** One sentence stating the main finding. */
   summary: string;
@@ -41,9 +31,9 @@ export function BarChart({
   const rows = items.filter((item) => Number.isFinite(item.value));
   if (rows.length === 0) return <EmptyChart summary={summary} />;
 
-  const max = Math.max(...rows.map((r) => Math.max(0, r.value)));
-  const x = linearScale([0, max], [0, WIDTH]);
-  const height = rows.length * ROW_HEIGHT;
+  const max = Math.max(0, ...rows.map((r) => r.value));
+  const share = (value: number) =>
+    max > 0 && value > 0 ? Math.max(0.5, (value / max) * 100) : 0;
 
   return (
     <ChartFigure
@@ -58,57 +48,38 @@ export function BarChart({
         })),
       }}
     >
-      <svg
-        role="img"
-        aria-label={title}
-        viewBox={`0 0 ${WIDTH} ${height}`}
-        width="100%"
-        preserveAspectRatio="xMidYMid meet"
-        className="block h-auto w-full"
-        fontSize={FONT_SIZE}
-      >
+      <div role="img" aria-label={title} className="space-y-2.5 text-[13px]">
         {rows.map((row, i) => {
-          const top = i * ROW_HEIGHT;
-          const barWidth = row.value > 0 ? Math.max(2, x(row.value)) : 0;
+          const width = share(row.value);
           return (
-            <g key={`${row.label}-${i}`}>
-              <title>{`${row.label}: ${formatValue(row.value)}`}</title>
-              <text
-                x={0}
-                y={top + LABEL_BASELINE}
-                style={{ fill: "var(--color-ink)" }}
+            <div
+              key={`${row.label}-${i}`}
+              title={`${row.label}: ${formatValue(row.value)}`}
+            >
+              <div className="flex items-baseline justify-between gap-3 leading-snug text-ink">
+                <span className="min-w-0 truncate">{row.label}</span>
+                <span className="shrink-0 font-semibold tabular-nums">
+                  {formatValue(row.value)}
+                </span>
+              </div>
+              <div
+                className="mt-1 h-2 overflow-hidden rounded-full"
+                style={{ background: "var(--chart-grid)" }}
               >
-                {truncate(row.label)}
-              </text>
-              <text
-                x={WIDTH}
-                y={top + LABEL_BASELINE}
-                textAnchor="end"
-                fontWeight={600}
-                style={{ fill: "var(--color-ink)" }}
-              >
-                {formatValue(row.value)}
-              </text>
-              <rect
-                x={0}
-                y={top + BAR_TOP}
-                width={WIDTH}
-                height={BAR_HEIGHT}
-                style={{ fill: "var(--chart-grid)" }}
-              />
-              {barWidth > 0 ? (
-                <rect
-                  x={0}
-                  y={top + BAR_TOP}
-                  width={barWidth}
-                  height={BAR_HEIGHT}
-                  style={{ fill: "var(--chart-bar)" }}
-                />
-              ) : null}
-            </g>
+                {width > 0 ? (
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${width}%`,
+                      background: "var(--chart-bar)",
+                    }}
+                  />
+                ) : null}
+              </div>
+            </div>
           );
         })}
-      </svg>
+      </div>
     </ChartFigure>
   );
 }

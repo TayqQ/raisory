@@ -375,18 +375,18 @@ summary:focus-visible {
  * Chart colours. Every fill and stroke is at least 3:1 against the paper
  * (WCAG 1.4.11) in both themes; text uses the ink and muted colours above.
  * The series tokens and --chart-axis flip with the theme (see the dark blocks
- * above). Stacked series also differ by pattern (solid, stripes, dots,
- * cross-hatch), so colour is never the only cue.
+ * above). Stacked series are solid: brand blue, accent orange, then slate (a
+ * pair colour-blind readers can tell apart, and a neutral). They keep the
+ * legend's order and have a data table, so colour is never the only cue.
  */
 :root {
   --chart-1: var(--data-1);
-  --chart-2: var(--data-3);
+  --chart-2: var(--data-2);
   --chart-3: var(--data-8);
   --chart-4: var(--data-6);
   --chart-bar: var(--brand);
   --chart-line: var(--brand);
   --chart-grid: var(--line);
-  --chart-mark: var(--surface);
   --chart-gap: var(--paper);
   --chart-text: var(--muted);
 }
@@ -407,5 +407,113 @@ summary:focus-visible {
 @keyframes ui-fade {
   from {
     opacity: 0;
+  }
+}
+
+/*
+ * Motion. Everything here eases transform and opacity, apart from the folds,
+ * which ease one element's height (grid rows, or a <details> element's
+ * content box). Nothing animates on first paint, and all of it is off under
+ * reduced motion.
+ */
+:root {
+  --ease-out-soft: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/*
+ * A panel that folds away (the funding summary). Its one child should be
+ * `min-h-0 overflow-hidden`; `data-open="false"` folds it. Visibility flips
+ * at the end of a close and the start of an open, so it is never reachable
+ * while folded.
+ */
+.motion-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 280ms var(--ease-out-soft),
+    opacity 220ms ease-out,
+    visibility 0s;
+}
+.motion-collapse[data-open="false"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 280ms var(--ease-out-soft),
+    opacity 220ms ease-out,
+    visibility 280ms;
+}
+
+/*
+ * <details class="motion-details"> slides open and shut where the browser
+ * can ease to and from `auto` (others open at once, as before). The clip
+ * margin keeps focus rings at the edges visible during the fold.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-details {
+    interpolate-size: allow-keywords;
+  }
+  .motion-details::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    overflow-clip-margin: 6px;
+    transition:
+      block-size 280ms var(--ease-out-soft),
+      opacity 200ms ease-out,
+      content-visibility 280ms allow-discrete;
+  }
+  .motion-details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+  /* Opened from a link: at once, so the page can scroll to it. */
+  .motion-details[data-instant]::details-content {
+    transition: none;
+  }
+}
+
+/*
+ * Funding rounds coming and going as the filters change (React view
+ * transitions; the classes are set in ROUND_MOTION). Rounds that stay slide
+ * to their new places, new ones fade and rise in once the leavers have
+ * started to go.
+ */
+::view-transition-group(.round-move) {
+  animation-duration: 300ms;
+  animation-timing-function: var(--ease-out-soft);
+}
+::view-transition-new(.round-enter) {
+  animation: round-enter 260ms var(--ease-out-soft) 80ms both;
+}
+::view-transition-old(.round-exit) {
+  animation: round-exit 160ms ease-in both;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+}
+@keyframes round-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@keyframes round-exit {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  .motion-collapse,
+  .motion-collapse[data-open="false"] {
+    transition: none;
   }
 }

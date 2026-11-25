@@ -1,3 +1,4 @@
+import { ViewTransition } from "react";
 import type { FundingFilters, FundingRow } from "@/core/read-models";
 import { Amount } from "@/components/ui/amount";
 import { ConfirmedMark } from "@/components/ui/confirmed-mark";
@@ -10,6 +11,7 @@ import { StageChip } from "@/components/ui/stage-chip";
 import {
   chipLabel,
   NO_DESCRIPTION,
+  ROUND_MOTION,
   RoundName,
   SortHeader,
   leadsLabel,
@@ -98,12 +100,17 @@ export function RoundList({
         </thead>
         <tbody className="max-md:block">
           {rows.map((row) => (
-            <RoundListRow
+            <ViewTransition
               key={row.eventId}
-              row={row}
-              logoUrl={logoUrls?.[row.companyId]}
-              now={now}
-            />
+              name={`round-row-${row.eventId}`}
+              {...ROUND_MOTION}
+            >
+              <RoundListRow
+                row={row}
+                logoUrl={logoUrls?.[row.companyId]}
+                now={now}
+              />
+            </ViewTransition>
           ))}
         </tbody>
       </table>

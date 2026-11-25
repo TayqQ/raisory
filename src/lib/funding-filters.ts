@@ -33,7 +33,11 @@ import { COUNTRY_REGIONS, REGIONS } from "@/lib/regions";
 import { SIZE_BAND_RANGES, SIZE_BANDS, type SizeBand } from "@/lib/size-bands";
 import type { Region } from "@/lib/regions";
 
-const DEFAULT_PAGE_SIZE = 25;
+/**
+ * 24 fills the card grid's 1, 2, 3 and 4 columns evenly, so a full page never
+ * leaves one card alone on its last row.
+ */
+const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
 const MAX_CITY_LENGTH = 80;
 const MAX_CITIES = 10;

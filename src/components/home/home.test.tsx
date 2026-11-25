@@ -42,7 +42,7 @@ const HREFS: Record<SummaryPeriod, string> = {
 };
 
 function filters(overrides: Partial<FundingFilters> = {}): FundingFilters {
-  return { page: 1, pageSize: 25, ...overrides };
+  return { page: 1, pageSize: 24, ...overrides };
 }
 
 function round(name: string, gbp: number): FundingRow {

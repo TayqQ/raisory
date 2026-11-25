@@ -142,7 +142,7 @@ export default async function HomePage({
       <h1 className="sr-only">Funding</h1>
 
       <SummaryProvider initial={summaryState}>
-        <div className="space-y-6">
+        <div>
           <SummaryFrame>
             <FundingSummary
               summary={summaryData}

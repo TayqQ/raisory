@@ -1,4 +1,3 @@
-import { useId } from "react";
 import {
   bandLayout,
   formatAxisValue,
@@ -8,11 +7,17 @@ import {
 } from "@/lib/chart-scale";
 import { ChartFigure, EmptyChart } from "./chart-figure";
 
-const WIDTH = 480;
+/*
+ * Drawn at its real size, not scaled from a viewBox, so text stays at 12 px
+ * however wide the chart is. Heights are pixels; columns are placed in
+ * percentages of the plot's width (laid out on a nominal width first, so the
+ * gaps keep the same proportion). The y-axis labels sit in their own column.
+ */
 const HEIGHT = 240;
-const MARGIN = { top: 10, right: 8, bottom: 30, left: 38 };
+const MARGIN = { top: 10, bottom: 30 };
+const AXIS_WIDTH = 38;
+const NOMINAL_WIDTH = 434;
 const FONT_SIZE = 12;
-const PATTERN_SIZE = 6;
 const SERIES_COUNT = 4;
 
 export interface ColumnCategory {
@@ -28,59 +33,15 @@ export interface ColumnSeries {
   values: readonly number[];
 }
 
-function seriesFill(prefix: string, index: number): string {
-  return `url(#${prefix}-${index % SERIES_COUNT})`;
-}
-
-/** Four fills that differ by pattern as well as colour. */
-function PatternDefs({ prefix }: { prefix: string }) {
-  const size = PATTERN_SIZE;
-  const base = (i: number) => ({
-    id: `${prefix}-${i}`,
-    patternUnits: "userSpaceOnUse" as const,
-    width: size,
-    height: size,
-  });
-  const ground = (i: number) => (
-    <rect
-      width={size}
-      height={size}
-      style={{ fill: `var(--chart-${i + 1})` }}
-    />
-  );
-  const mark = { stroke: "var(--chart-mark)", strokeWidth: 1.5 };
-  return (
-    <defs>
-      <pattern {...base(0)}>{ground(0)}</pattern>
-      <pattern {...base(1)} patternTransform="rotate(45)">
-        {ground(1)}
-        <line x1={0} y1={0} x2={0} y2={size} style={mark} />
-      </pattern>
-      <pattern {...base(2)}>
-        {ground(2)}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={1.3}
-          style={{ fill: "var(--chart-mark)" }}
-        />
-      </pattern>
-      <pattern {...base(3)} patternTransform="rotate(45)">
-        {ground(3)}
-        <line x1={0} y1={0} x2={0} y2={size} style={mark} />
-        <line x1={0} y1={0} x2={size} y2={0} style={mark} />
-      </pattern>
-    </defs>
-  );
-}
-
-function safeId(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9]/g, "");
+/** A solid series colour; four tokens, reused if there are more series. */
+function seriesFill(index: number): string {
+  return `var(--chart-${(index % SERIES_COUNT) + 1})`;
 }
 
 /**
  * Weekly columns, stacked when there is more than one series. Stacked series
- * differ by fill pattern as well as colour, and have a text legend.
+ * have solid colours, keep the legend's order from the bottom up, and have a
+ * text legend and a data table, so colour is never the only cue.
  */
 export function ColumnChart({
   title,
@@ -91,7 +52,7 @@ export function ColumnChart({
   labelEvery = 4,
   formatValue = (n) => formatAxisValue(n),
 }: {
-  /** Accessible name of the SVG. */
+  /** Accessible name of the chart. */
   title: string;
   /** One sentence stating the main finding. */
   summary: string;
@@ -104,7 +65,6 @@ export function ColumnChart({
   /** Formats y-axis labels. */
   formatValue?: (value: number) => string;
 }) {
-  const id = safeId(useId());
   const hasData =
     categories.length > 0 &&
     series.length > 0 &&
@@ -117,19 +77,16 @@ export function ColumnChart({
   );
   const ticks = niceTicks(Math.max(...totals.slice(0, categories.length)), 4);
   const yMax = ticks[ticks.length - 1]!;
-  const plotLeft = MARGIN.left;
-  const plotRight = WIDTH - MARGIN.right;
   const plotTop = MARGIN.top;
   const plotBottom = HEIGHT - MARGIN.bottom;
   const y = linearScale([0, yMax], [plotBottom, plotTop]);
+  const percent = (n: number) => `${((n / NOMINAL_WIDTH) * 100).toFixed(3)}%`;
   const bands = bandLayout(
     categories.length,
-    plotRight - plotLeft,
+    NOMINAL_WIDTH,
     categories.length > 26 ? 2 : 6,
   );
   const every = Math.max(1, Math.floor(labelEvery));
-  const patternPrefix = `${id}-fill`;
-  const swatchPrefix = `${id}-key`;
 
   const legend = stacked ? (
     <ul
@@ -138,15 +95,11 @@ export function ColumnChart({
     >
       {series.map((s, i) => (
         <li key={s.key} className="flex items-center gap-2">
-          <svg width={14} height={14} viewBox="0 0 14 14" aria-hidden="true">
-            <PatternDefs prefix={swatchPrefix} />
-            <rect
-              width={14}
-              height={14}
-              fill={seriesFill(swatchPrefix, i)}
-              style={{ stroke: "var(--chart-axis)", strokeWidth: 0.5 }}
-            />
-          </svg>
+          <span
+            aria-hidden="true"
+            className="size-3 shrink-0 rounded-[3px]"
+            style={{ background: seriesFill(i) }}
+          />
           {s.label}
         </li>
       ))}
@@ -175,81 +128,96 @@ export function ColumnChart({
         rows: tableRows,
       }}
     >
-      <svg
-        role="img"
-        aria-label={title}
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        width="100%"
-        preserveAspectRatio="xMidYMid meet"
-        className="block h-auto w-full"
-        fontSize={FONT_SIZE}
+      <div
+        className="relative pr-2"
+        style={{ paddingLeft: AXIS_WIDTH, height: HEIGHT }}
       >
-        <PatternDefs prefix={patternPrefix} />
-        {ticks.map((tick) => (
-          <g key={tick}>
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 tabular-nums leading-none"
+          style={{
+            width: AXIS_WIDTH,
+            fontSize: FONT_SIZE,
+            color: "var(--chart-text)",
+          }}
+        >
+          {ticks.map((tick) => (
+            <span
+              key={tick}
+              className="absolute right-1.5 -translate-y-1/2"
+              style={{ top: y(tick) }}
+            >
+              {formatValue(tick)}
+            </span>
+          ))}
+        </div>
+        <svg
+          role="img"
+          aria-label={title}
+          width="100%"
+          height={HEIGHT}
+          className="block overflow-visible"
+          fontSize={FONT_SIZE}
+        >
+          {ticks.map((tick) => (
             <line
-              x1={plotLeft}
-              x2={plotRight}
+              key={tick}
+              x1="0"
+              x2="100%"
               y1={y(tick)}
               y2={y(tick)}
               style={{ stroke: "var(--chart-grid)" }}
               strokeWidth={1}
             />
-            <text
-              x={plotLeft - 6}
-              y={y(tick)}
-              textAnchor="end"
-              dominantBaseline="middle"
-              style={{ fill: "var(--chart-text)" }}
-            >
-              {formatValue(tick)}
-            </text>
-          </g>
-        ))}
-        <line
-          x1={plotLeft}
-          x2={plotRight}
-          y1={plotBottom}
-          y2={plotBottom}
-          style={{ stroke: "var(--chart-axis)" }}
-          strokeWidth={1}
-        />
-        {bands.map((band, i) => {
-          const category = categories[i]!;
-          return (
-            <g key={`${category.label}-${i}`}>
-              <title>{`${category.label}: ${formatValue(totals[i] ?? 0)}`}</title>
-              {layers.map((layer, layerIndex) => {
-                const segment = layer.segments[i]!;
-                const top = y(segment.end);
-                const height = y(segment.start) - top;
-                if (height <= 0) return null;
-                return (
-                  <rect
-                    key={layer.key}
-                    x={plotLeft + band.x}
-                    y={top}
-                    width={band.width}
-                    height={height}
-                    fill={seriesFill(patternPrefix, layerIndex)}
-                    style={{ stroke: "var(--chart-gap)", strokeWidth: 0.5 }}
-                  />
-                );
-              })}
-              {i % every === 0 ? (
-                <text
-                  x={plotLeft + band.x + band.width / 2}
-                  y={plotBottom + 16}
-                  textAnchor="middle"
-                  style={{ fill: "var(--chart-text)" }}
-                >
-                  {category.axisLabel ?? category.label}
-                </text>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
+          ))}
+          <line
+            x1="0"
+            x2="100%"
+            y1={plotBottom}
+            y2={plotBottom}
+            style={{ stroke: "var(--chart-axis)" }}
+            strokeWidth={1}
+          />
+          {bands.map((band, i) => {
+            const category = categories[i]!;
+            return (
+              <g key={`${category.label}-${i}`}>
+                <title>{`${category.label}: ${formatValue(totals[i] ?? 0)}`}</title>
+                {layers.map((layer, layerIndex) => {
+                  const segment = layer.segments[i]!;
+                  const top = y(segment.end);
+                  const height = y(segment.start) - top;
+                  if (height <= 0) return null;
+                  return (
+                    <rect
+                      key={layer.key}
+                      x={percent(band.x)}
+                      y={top}
+                      width={percent(band.width)}
+                      height={height}
+                      style={{
+                        fill: seriesFill(layerIndex),
+                        stroke: "var(--chart-gap)",
+                        strokeWidth: 1,
+                      }}
+                    />
+                  );
+                })}
+                {i % every === 0 ? (
+                  <text
+                    x={percent(band.x + band.width / 2)}
+                    y={plotBottom + 18}
+                    textAnchor="middle"
+                    style={{ fill: "var(--chart-text)" }}
+                  >
+                    {category.axisLabel ?? category.label}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </ChartFigure>
   );
 }

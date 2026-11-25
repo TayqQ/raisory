@@ -1,3 +1,4 @@
+import { ViewTransition } from "react";
 import type { FundingRow } from "@/core/read-models";
 import { Amount } from "@/components/ui/amount";
 import { ConfirmedMark } from "@/components/ui/confirmed-mark";
@@ -9,16 +10,18 @@ import { SectorLabel } from "@/components/ui/sector-label";
 import { StageChip } from "@/components/ui/stage-chip";
 import {
   NO_DESCRIPTION,
+  ROUND_MOTION,
   RoundName,
   chipLabel,
   leadsLabel,
 } from "./round-row-parts";
 
 /**
- * The Cards view (from direction B): one card per round in a 1, 2 or 3 column
- * grid. Identity and place on top, a two-line description, a facts row
+ * The Cards view (from direction B): one card per round in a 1, 2, 3 or 4
+ * column grid (the default page of 24 fills every one of them evenly). Identity and place on top, a two-line description, a facts row
  * (amount, stage, sector) and a footer with the date and the leads. The whole
- * card is the company link.
+ * card is the company link. When filters, sort or page change, cards that stay
+ * glide to their new place and the others fade out or in (`ROUND_MOTION`).
  */
 export function RoundCards({
   rows,
@@ -33,12 +36,22 @@ export function RoundCards({
   return (
     <ul
       aria-label="Funding rounds"
-      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-5"
+      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
       {rows.map((row) => (
-        <li key={row.eventId} className="min-w-0">
-          <RoundCard row={row} logoUrl={logoUrls?.[row.companyId]} now={now} />
-        </li>
+        <ViewTransition
+          key={row.eventId}
+          name={`round-card-${row.eventId}`}
+          {...ROUND_MOTION}
+        >
+          <li className="min-w-0">
+            <RoundCard
+              row={row}
+              logoUrl={logoUrls?.[row.companyId]}
+              now={now}
+            />
+          </li>
+        </ViewTransition>
       ))}
     </ul>
   );

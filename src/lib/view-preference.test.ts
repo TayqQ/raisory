@@ -13,8 +13,8 @@ import {
 } from "./view-preference";
 
 describe("resolveListView", () => {
-  it("is List with no cookie and no parameter", () => {
-    expect(resolveListView({})).toBe("list");
+  it("is Cards with no cookie and no parameter", () => {
+    expect(resolveListView({})).toBe("cards");
   });
 
   it("uses the cookie on its own", () => {
@@ -30,8 +30,8 @@ describe("resolveListView", () => {
 
   it("ignores invalid values and falls through to the next source", () => {
     expect(resolveListView({ param: "grid", cookie: "cards" })).toBe("cards");
-    expect(resolveListView({ param: "", cookie: "tiles" })).toBe("list");
-    expect(resolveListView({ param: 3, cookie: undefined })).toBe("list");
+    expect(resolveListView({ param: "", cookie: "tiles" })).toBe("cards");
+    expect(resolveListView({ param: 3, cookie: undefined })).toBe("cards");
     expect(parseListView(" Cards ")).toBe("cards");
     expect(parseListView("table")).toBeUndefined();
   });
@@ -120,13 +120,13 @@ describe("summary period", () => {
 
 describe("withViewParam", () => {
   it("sets the view and keeps the other parameters", () => {
-    expect(withViewParam("/?sector=fintech&page=2", "cards")).toBe(
-      "/?sector=fintech&page=2&view=cards",
+    expect(withViewParam("/?sector=fintech&page=2", "list")).toBe(
+      "/?sector=fintech&page=2&view=list",
     );
   });
 
-  it("drops the parameter for List, the default", () => {
-    expect(withViewParam("/?view=cards&q=acme", "list")).toBe("/?q=acme");
-    expect(withViewParam("/?view=cards", "list")).toBe("/");
+  it("drops the parameter for Cards, the default", () => {
+    expect(withViewParam("/?view=list&q=acme", "cards")).toBe("/?q=acme");
+    expect(withViewParam("/?view=list", "cards")).toBe("/");
   });
 });

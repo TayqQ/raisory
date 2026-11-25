@@ -58,7 +58,7 @@ const BARE = row({
   investorCount: 0,
 });
 
-const filters: FundingFilters = { page: 1, pageSize: 25, tag: "robotics" };
+const filters: FundingFilters = { page: 1, pageSize: 24, tag: "robotics" };
 
 beforeEach(() => {
   replace.mockClear();
@@ -347,24 +347,24 @@ describe("ViewSwitch", () => {
     );
   });
 
-  it("keeps the URL plain for List, the default", () => {
-    window.history.replaceState(null, "", "/?view=cards");
-    render(<ViewSwitch view="cards" href="/?view=cards" />);
+  it("keeps the URL plain for Cards, the default", () => {
+    window.history.replaceState(null, "", "/?view=list");
+    render(<ViewSwitch view="list" href="/?view=list" />);
     act(() => {
-      fireEvent.click(screen.getByRole("radio", { name: "List" }));
+      fireEvent.click(screen.getByRole("radio", { name: "Cards" }));
     });
-    expect(document.cookie).toContain("raisory_view=list");
+    expect(document.cookie).toContain("raisory_view=cards");
     expect(replace).toHaveBeenCalledWith("/", { scroll: false });
   });
 
   it("remembers the choice in the cookie and puts it in the URL", () => {
     window.history.replaceState(null, "", "/?sector=fintech");
-    render(<ViewSwitch view="list" href="/?sector=fintech" />);
+    render(<ViewSwitch view="cards" href="/?sector=fintech" />);
     act(() => {
-      fireEvent.click(screen.getByRole("radio", { name: "Cards" }));
+      fireEvent.click(screen.getByRole("radio", { name: "List" }));
     });
-    expect(document.cookie).toContain("raisory_view=cards");
-    expect(replace).toHaveBeenCalledWith("/?sector=fintech&view=cards", {
+    expect(document.cookie).toContain("raisory_view=list");
+    expect(replace).toHaveBeenCalledWith("/?sector=fintech&view=list", {
       scroll: false,
     });
   });

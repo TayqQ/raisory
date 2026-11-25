@@ -113,21 +113,17 @@ describe("ColumnChart", () => {
     expect(items).toEqual(["Early stage", "Later stage", "Unknown stage"]);
   });
 
-  it("separates series by pattern as well as colour", () => {
+  it("gives each stacked series its own solid colour", () => {
     const { container } = renderStacked();
     const fills = new Set(
-      Array.from(container.querySelectorAll("svg[role='img'] rect[fill]")).map(
-        (rect) => rect.getAttribute("fill"),
+      Array.from(container.querySelectorAll("svg[role='img'] rect")).map(
+        (rect) => (rect as SVGRectElement).style.fill,
       ),
     );
-    expect(fills.size).toBe(3);
-    const patterns = container.querySelectorAll("svg[role='img'] pattern");
-    expect(patterns.length).toBe(4);
-    expect(
-      container.querySelectorAll(
-        "svg[role='img'] pattern line, svg[role='img'] pattern circle",
-      ).length,
-    ).toBeGreaterThan(0);
+    expect(fills).toEqual(
+      new Set(["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"]),
+    );
+    expect(container.querySelector("pattern")).toBeNull();
   });
 
   it("shows x labels only on every nth column", () => {

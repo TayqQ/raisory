@@ -409,7 +409,7 @@ describe("read queries", () => {
 
     const invalid = await listFundingRounds(db, { page: 0, pageSize: 0 });
     expect(invalid.page).toBe(1);
-    expect(invalid.pageSize).toBe(25);
+    expect(invalid.pageSize).toBe(24);
   });
 
   it("excludes merged companies and redirects their detail", async () => {
