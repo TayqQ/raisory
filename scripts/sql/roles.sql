@@ -45,3 +45,16 @@ REVOKE ALL ON grant_project_texts FROM signalfeed_web;
 -- domains, rule outcomes and icon links, and company_logos holds a company's
 -- logo image: organisation facts only. The web role reads both, and the
 -- migration grants these privileges itself as well. Page text is never stored.
+
+-- Site feedback (migration 0007, D75) is anonymous, and the site writes it as
+-- the web role, but that role must never read it back. It may insert and count
+-- rows through site_feedback_count_since(), and nothing else, so the SELECT
+-- granted above is revoked. It needs no rights on the id sequence: an identity
+-- column fills itself. The migration grants the same itself. backfill_progress
+-- needs no revoke: it holds job cursors only.
+REVOKE ALL ON site_feedback FROM signalfeed_web;
+REVOKE ALL ON SEQUENCE site_feedback_id_seq FROM signalfeed_web;
+GRANT INSERT ON site_feedback TO signalfeed_web;
+REVOKE ALL ON FUNCTION site_feedback_count_since(timestamp with time zone) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION site_feedback_count_since(timestamp with time zone)
+  TO signalfeed_ingest, signalfeed_web;

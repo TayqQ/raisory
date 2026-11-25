@@ -27,6 +27,8 @@ Run this once as the owner, with two strong passwords you generate:
 psql "<owner direct url>" -v ingest_password='...' -v web_password='...' -f scripts/sql/roles.sql
 ```
 
+Site feedback (migration `0007_backfill_feedback`, D75) is the one table the web role writes: it may insert into `site_feedback` and count rows through `site_feedback_count_since()`, but never read, change or delete a row. The migration grants this itself and revokes the read access that default privileges give a new table, so nothing needs doing after merge: the Migrate workflow applies it. Re-running the roles script later is safe and leaves the same grants. To check, `psql "<web url>" -c "select * from site_feedback limit 1"` must fail with a permission error.
+
 ## 4. Set up the LLM key
 
 Create an OpenAI project key. Buy prepaid credit ($5 is the minimum), turn auto-recharge **off**, and set a project budget limit if one is available. Prepaid credit is the outer spend limit: when it runs out, the provider stops serving requests.

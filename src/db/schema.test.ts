@@ -65,6 +65,7 @@ import { createTestDb, type TestDb } from "./testing";
 
 const EXPECTED_TABLES = [
   "acquisitions",
+  "backfill_progress",
   "ch_address_counts",
   "ch_companies",
   "ch_filings",
@@ -102,6 +103,7 @@ const EXPECTED_TABLES = [
   "merge_candidates",
   "registry_links",
   "registry_searches",
+  "site_feedback",
   "source_item_texts",
   "source_items",
   "sources",

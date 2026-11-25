@@ -22,6 +22,7 @@ import {
   uniqueIndex,
   vector,
 } from "drizzle-orm/pg-core";
+import type { BackfillJob } from "@/core/backfill";
 import type { IngestStats } from "@/core/domain";
 import {
   ALIAS_SOURCES,
@@ -58,6 +59,7 @@ import {
   WEBSITE_SOURCES,
 } from "@/core/enums";
 import type { ExtractionV1, ExtractionV2 } from "@/core/extraction-schema";
+import { FEEDBACK_KINDS } from "@/core/feedback";
 import type { CapitalAmount } from "@/core/registry";
 
 export const EMBEDDING_DIMENSIONS = 512;
@@ -1299,6 +1301,77 @@ export const companyLogos = pgTable(
       sql`${t.width} > 0 AND ${t.height} > 0`,
     ),
     check("company_logos_sha256_hex", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
+// Backfills and site feedback (migration 0007, D75)
+
+/**
+ * One row per backfill job, so a long backfill carries on where it stopped.
+ * Only `src/db/backfill-progress.ts` writes it, checking each cursor against
+ * its job's schema in `src/core/backfill.ts`. Job names are plain text, so a
+ * new job needs no migration.
+ */
+export const backfillProgress = pgTable(
+  "backfill_progress",
+  {
+    job: text("job").$type<BackfillJob>().primaryKey(),
+    /** Where the job carries on from; null until the first save. */
+    cursor: jsonb("cursor"),
+    startedAt: createdNow("started_at"),
+    updatedAt: createdNow("updated_at"),
+    /** Null until the job is done. */
+    finishedAt: timestamptz("finished_at"),
+  },
+  (t) => [
+    check(
+      "backfill_progress_cursor_object",
+      sql`${t.cursor} IS NULL OR jsonb_typeof(${t.cursor}) = 'object'`,
+    ),
+  ],
+);
+
+/**
+ * Anonymous feedback from the site. It holds no IP address, user agent, cookie,
+ * email or any other identifier, and must never gain one. The web role may
+ * insert rows and count them through `site_feedback_count_since`, but never
+ * read them (D75). Only `src/db/feedback.ts` writes it.
+ */
+export const siteFeedback = pgTable(
+  "site_feedback",
+  {
+    id: id(),
+    kind: text("kind", { enum: FEEDBACK_KINDS }).notNull(),
+    /** The page path only, such as `/companies/acme`. */
+    path: text("path").notNull(),
+    /** The page's search params as it encodes them. */
+    filters: text("filters"),
+    /** The visitor's words for `missing`; null for `alerts_interest`. */
+    message: text("message"),
+    createdAt: createdNow("created_at"),
+  },
+  (t) => [
+    index("site_feedback_created_at_idx").on(t.createdAt),
+    check(
+      "site_feedback_kind",
+      sql`${t.kind} IN ('missing', 'alerts_interest')`,
+    ),
+    check(
+      "site_feedback_path",
+      sql`char_length(${t.path}) BETWEEN 1 AND 200 AND left(${t.path}, 1) = '/'`,
+    ),
+    check(
+      "site_feedback_filters_length",
+      sql`char_length(${t.filters}) BETWEEN 1 AND 500`,
+    ),
+    check(
+      "site_feedback_message_length",
+      sql`char_length(${t.message}) BETWEEN 1 AND 1000`,
+    ),
+    check(
+      "site_feedback_message_by_kind",
+      sql`(${t.kind} = 'missing') = (${t.message} IS NOT NULL)`,
+    ),
   ],
 );
 
