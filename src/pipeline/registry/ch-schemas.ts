@@ -39,10 +39,11 @@ export const chSearchResponseSchema = z.object({
 export const chProfileSchema = z.object({
   company_name: z.string(),
   company_number: z.string(),
-  company_status: z.string(),
+  // Missing on charities and registered societies (see `getCompany`).
+  company_status: z.string().nullish(),
   company_status_detail: z.string().nullish(),
   type: z.string(),
-  date_of_creation: date,
+  date_of_creation: date.nullish(),
   date_of_cessation: optionalDate,
   sic_codes: z.array(z.string()).default([]),
   registered_office_address: chAddressSchema.nullish(),
@@ -88,5 +89,9 @@ export const chAdvancedSearchSchema = z.object({
 });
 
 export type ChSearchItem = z.infer<typeof chSearchItemSchema>;
-export type ChProfile = z.infer<typeof chProfileSchema>;
+/** A profile with the status and incorporation date every company has. */
+export type ChProfile = z.infer<typeof chProfileSchema> & {
+  company_status: string;
+  date_of_creation: string;
+};
 export type ChFilingItem = z.infer<typeof chFilingItemSchema>;

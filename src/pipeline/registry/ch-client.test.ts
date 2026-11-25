@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ChApiError,
+  ChResponseError,
   RateLimitedError,
   TimeLimitReached,
   createChClient,
@@ -101,6 +102,28 @@ describe("createChClient", () => {
     const { client } = setup(() => jsonResponse(profile));
     const result = await client.getCompany("09100417");
     expect(result?.ceasedOn).toBeNull();
+  });
+
+  it("returns null for a charity or society record with no status or incorporation date", async () => {
+    const profile = JSON.parse(
+      JSON.stringify(loadChFixture("profile-active.json")),
+    ) as Record<string, unknown>;
+    delete profile.company_status;
+    delete profile.date_of_creation;
+    profile.company_number = "CE017612";
+    const { client } = setup(() => jsonResponse(profile));
+    expect(await client.getCompany("CE017612")).toBeNull();
+  });
+
+  it("still rejects a profile whose incorporation date is not a date", async () => {
+    const profile = JSON.parse(
+      JSON.stringify(loadChFixture("profile-active.json")),
+    ) as Record<string, unknown>;
+    profile.date_of_creation = "Unknown";
+    const { client } = setup(() => jsonResponse(profile));
+    await expect(client.getCompany("09100417")).rejects.toBeInstanceOf(
+      ChResponseError,
+    );
   });
 
   it("maps active, dormant and dissolved profiles and ignores unknown fields", async () => {

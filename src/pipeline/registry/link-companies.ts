@@ -34,7 +34,7 @@ import {
   TimeLimitReached,
   type ChClient,
 } from "./ch-client";
-import type { ConfirmableEvent } from "./confirm-rules";
+import { isEquityRound, type ConfirmableEvent } from "./confirm-rules";
 import {
   TAKEN_MERGE_REASONS,
   recordCandidate,
@@ -830,6 +830,35 @@ async function decideWithFilings(
   return result;
 }
 
+/**
+ * Fetches capital filings for a newly linked company that has an equity round,
+ * when the rules did not already fetch them, so the confirm step can check the
+ * round in the same run rather than after the next profile refresh.
+ */
+async function fetchFilingsOnLink(
+  ctx: LinkContext,
+  facts: CompanyLinkFacts,
+  candidates: ChLinkCandidate[],
+  number: string,
+): Promise<void> {
+  if (!facts.company.events.some(isEquityRound)) return;
+  const candidate = candidates.find((c) => c.profile.companyNumber === number);
+  if (!candidate || candidate.filings !== null) return;
+  const since = filingsSince(facts.company.events);
+  ctx.budget.require(1);
+  const filings = await ctx.client.getCapitalFilings(
+    number,
+    since === undefined ? {} : { since },
+  );
+  ctx.stats.filingsStored += await storeChFilings(
+    ctx.db,
+    number,
+    filings,
+    ctx.now,
+  );
+  candidate.filings = filings;
+}
+
 /** Writes the decision through the link store. Returns the search outcome. */
 async function applyResult(
   ctx: LinkContext,
@@ -865,6 +894,7 @@ async function applyResult(
         stats.linkedByMethod[decision.method] =
           (stats.linkedByMethod[decision.method] ?? 0) + 1;
         await fillFoundedYear(db, linked.companyId, profile.incorporatedOn);
+        await fetchFilingsOnLink(ctx, facts, candidates, decision.registryId);
       } else if (linked.outcome === "blocked") {
         outcome = "none";
       } else {

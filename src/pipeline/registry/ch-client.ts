@@ -68,7 +68,10 @@ export interface ChSearchHit {
 
 export interface ChClient {
   searchCompanies(name: string): Promise<ChSearchHit[]>;
-  /** Null when the company does not exist (404). */
+  /**
+   * Null when the company does not exist (404), or when the record has no
+   * status or incorporation date (charities and registered societies).
+   */
   getCompany(companyNumber: string): Promise<RegistryCompanyFacts | null>;
   /** SH01 filings, newest first, stopping at those filed before `since`. */
   getCapitalFilings(
@@ -249,7 +252,17 @@ export function createChClient(options: ChClientOptions): ChClient {
         "company profile",
         true,
       );
-      return profile === null ? null : profileToFacts(profile);
+      if (profile === null) return null;
+      const { company_status: status, date_of_creation: created } = profile;
+      // Charitable incorporated organisations (CE, CS), registered societies
+      // (RS) and similar records come with neither. They cannot be linked or
+      // file an SH01, so they count as not found rather than a shape error.
+      if (!status || !created) return null;
+      return profileToFacts({
+        ...profile,
+        company_status: status,
+        date_of_creation: created,
+      });
     },
 
     /**

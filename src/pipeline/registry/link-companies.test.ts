@@ -469,6 +469,47 @@ describe("linkCompanies: step 0, repeats and founded years", () => {
     expect(calls).toEqual(["profile:09876501"]);
   });
 
+  it("fetches filings when it links a company with an equity round, so the confirm step can check it", async () => {
+    const company = await insertCompany("Glowtern Energy", {
+      ukCompanyNumber: "09876501",
+    });
+    await addRound(company.id, "2026-10-01");
+    await addGrantParticipant(company.id, {
+      name: "Glowtern Energy Ltd",
+      regNumber: "9876501",
+    });
+    const glowtern = profile({
+      companyNumber: "09876501",
+      name: "GLOWTERN ENERGY LTD",
+    });
+    const { client, calls } = recordingClient({
+      companies: [glowtern],
+      filings: { "09876501": [sh01("2026-09-20")] },
+    });
+    const stats = await run(client);
+    expect(calls).toEqual(["profile:09876501", "filings:09876501"]);
+    expect(await db.select().from(chFilings)).toHaveLength(1);
+    expect(stats.filingsStored).toBe(1);
+  });
+
+  it("fetches no filings on a link when the company has only grant or debt rounds", async () => {
+    const company = await insertCompany("Glowtern Energy", {
+      ukCompanyNumber: "09876501",
+    });
+    await addRound(company.id, "2026-10-01", "debt");
+    await addGrantParticipant(company.id, {
+      name: "Glowtern Energy Ltd",
+      regNumber: "9876501",
+    });
+    const { client, calls } = recordingClient({
+      companies: [
+        profile({ companyNumber: "09876501", name: "GLOWTERN ENERGY LTD" }),
+      ],
+    });
+    await run(client);
+    expect(calls).toEqual(["profile:09876501"]);
+  });
+
   it("puts grant companies with a number first", async () => {
     const news = await insertCompany("Nova");
     await addRound(news.id, "2026-10-01");
@@ -1106,7 +1147,7 @@ describe("linkCompanies: company numbers on websites (D65)", () => {
     });
   }
 
-  it("links by the number on a W2 website with one request and no search, and writes no country", async () => {
+  it("links by the number on a W2 website with no search, fetches its filings, and writes no country", async () => {
     const company = await insertCompany("Brightwell Robotics", {
       countryCode: null,
     });
@@ -1115,7 +1156,8 @@ describe("linkCompanies: company numbers on websites (D65)", () => {
     const { client, calls } = brightwellClient();
     const stats = await run(client);
 
-    expect(calls).toEqual(["profile:13579246"]);
+    // The equity round needs filings for the confirm step.
+    expect(calls).toEqual(["profile:13579246", "filings:13579246"]);
     const [link] = await linksOf(company.id);
     expect(link).toMatchObject({
       registryId: "13579246",

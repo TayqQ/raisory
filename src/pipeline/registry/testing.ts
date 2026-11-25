@@ -14,7 +14,7 @@ import {
   type ChClient,
   type ChSearchHit,
 } from "./ch-client";
-import { chProfileSchema } from "./ch-schemas";
+import { chProfileSchema, type ChProfile } from "./ch-schemas";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -81,7 +81,9 @@ export function fixtureCompanies(): RegistryCompanyFacts[] {
     "profile-active.json",
     "profile-dormant.json",
     "profile-dissolved.json",
-  ].map((name) => profileToFacts(chProfileSchema.parse(loadChFixture(name))));
+  ].map((name) =>
+    profileToFacts(chProfileSchema.parse(loadChFixture(name)) as ChProfile),
+  );
 }
 
 /** A fake `ChClient` with no network, for the registry step and eval tests. */
