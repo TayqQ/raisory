@@ -37,6 +37,14 @@ export class TimeLimitReached extends Error {
   }
 }
 
+/** A 2xx answer that is not JSON or not the shape the schemas describe. */
+export class ChResponseError extends Error {
+  constructor(label: string, problem: string) {
+    super(`Companies House ${label} ${problem}`);
+    this.name = "ChResponseError";
+  }
+}
+
 export class ChApiError extends Error {
   constructor(
     readonly status: number,
@@ -193,13 +201,11 @@ export function createChClient(options: ChClientOptions): ChClient {
     try {
       json = JSON.parse(response.body);
     } catch {
-      throw new Error(`Companies House ${label} returned invalid JSON`);
+      throw new ChResponseError(label, "returned invalid JSON");
     }
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
-      throw new Error(
-        `Companies House ${label} did not match the expected shape`,
-      );
+      throw new ChResponseError(label, "did not match the expected shape");
     }
     return parsed.data as T;
   }

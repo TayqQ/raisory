@@ -4,7 +4,17 @@ import { z } from "zod";
 // A37, A38). Unknown keys are ignored. Officer, PSC and charges data is never
 // described here, so it can never be parsed or stored (D58).
 
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const date = z.string().regex(ISO_DATE);
+/**
+ * A date that may be missing. Companies House sends "Unknown" as the
+ * cessation date of some converted or closed companies; any value that is not
+ * an ISO date is read as no date, so one odd item cannot fail a whole search.
+ */
+const optionalDate = z
+  .string()
+  .nullish()
+  .transform((value) => (value != null && ISO_DATE.test(value) ? value : null));
 
 export const chAddressSchema = z.object({
   postal_code: z.string().nullish(),
@@ -16,8 +26,8 @@ export const chSearchItemSchema = z.object({
   company_number: z.string(),
   company_status: z.string().nullish(),
   company_type: z.string().nullish(),
-  date_of_creation: date.nullish(),
-  date_of_cessation: date.nullish(),
+  date_of_creation: optionalDate,
+  date_of_cessation: optionalDate,
   address: chAddressSchema.nullish(),
 });
 
@@ -33,7 +43,7 @@ export const chProfileSchema = z.object({
   company_status_detail: z.string().nullish(),
   type: z.string(),
   date_of_creation: date,
-  date_of_cessation: date.nullish(),
+  date_of_cessation: optionalDate,
   sic_codes: z.array(z.string()).default([]),
   registered_office_address: chAddressSchema.nullish(),
   accounts: z
@@ -41,8 +51,8 @@ export const chProfileSchema = z.object({
       last_accounts: z
         .object({
           type: z.string().nullish(),
-          period_end_on: date.nullish(),
-          made_up_to: date.nullish(),
+          period_end_on: optionalDate,
+          made_up_to: optionalDate,
         })
         .nullish(),
     })
@@ -57,7 +67,7 @@ export const chFilingItemSchema = z.object({
   transaction_id: z.string(),
   type: z.string(),
   date,
-  action_date: date.nullish(),
+  action_date: optionalDate,
   description_values: z
     .object({
       capital: z

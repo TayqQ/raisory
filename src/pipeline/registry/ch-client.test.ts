@@ -67,6 +67,42 @@ describe("createChClient", () => {
     );
   });
 
+  it('reads a cessation date of "Unknown" as no date instead of failing the search', async () => {
+    const { client } = setup(() =>
+      jsonResponse({
+        items: [
+          {
+            title: "KESTREL LANTERN LABS LIMITED",
+            company_number: "09100417",
+            company_status: "active",
+            date_of_creation: "2019-08-30",
+          },
+          {
+            title: "KESTREL LANTERN (OLD)",
+            company_number: "SC000123",
+            company_status: "converted-closed",
+            date_of_creation: "Unknown",
+            date_of_cessation: "Unknown",
+          },
+        ],
+      }),
+    );
+    const hits = await client.searchCompanies("Kestrel Lantern");
+    expect(hits).toHaveLength(2);
+    expect(hits[0]?.incorporatedOn).toBe("2019-08-30");
+    expect(hits[1]).toMatchObject({ incorporatedOn: null, ceasedOn: null });
+  });
+
+  it("reads an odd profile cessation date as no date", async () => {
+    const profile = JSON.parse(
+      JSON.stringify(loadChFixture("profile-active.json")),
+    ) as Record<string, unknown>;
+    profile.date_of_cessation = "Unknown";
+    const { client } = setup(() => jsonResponse(profile));
+    const result = await client.getCompany("09100417");
+    expect(result?.ceasedOn).toBeNull();
+  });
+
   it("maps active, dormant and dissolved profiles and ignores unknown fields", async () => {
     const { client } = setup(route);
     const active = await client.getCompany("9100417");

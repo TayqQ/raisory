@@ -8,7 +8,18 @@ import {
   registryLinks,
 } from "@/db/schema";
 import { createTestDb, type TestDb } from "@/db/testing";
-import { RateLimitedError, createChClient, type ChClient } from "./ch-client";
+import {
+  ChApiError,
+  ChResponseError,
+  RateLimitedError,
+  createChClient,
+  type ChClient,
+} from "./ch-client";
+import {
+  ChErrorStreak,
+  MAX_CONSECUTIVE_CH_ERRORS,
+  RepeatedChErrors,
+} from "./link-companies";
 import { createWindowLimiter } from "./rate-limit";
 import { registryStep } from "./registry-step";
 import { fakeChFetcher, jsonResponse, loadChFixture } from "./testing";
@@ -285,5 +296,118 @@ describe("registryStep", () => {
     expect(lines.at(-1)).toContain("stopped: time limit");
     expect(deadlines[0]).toEqual(new Date(NOW.getTime() + 60_000));
     expect(deadlines.at(-1)).toBeNull();
+  });
+
+  it("fails when Companies House rejects every search, as with a bad key", async () => {
+    for (let i = 1; i <= MAX_CONSECUTIVE_CH_ERRORS + 1; i += 1) {
+      await db.insert(companies).values({
+        slug: `works-${i}`,
+        name: `Works Number ${i}`,
+        normalisedName: `works number ${i}`,
+        countryCode: "GB",
+      });
+    }
+    const { client, fake } = fixtureClient(() => jsonResponse("bad", 400));
+    const lines: string[] = [];
+    await expect(
+      registryStep({
+        db,
+        client,
+        clock,
+        maxRequests: 100,
+        log: (line) => lines.push(line),
+      }),
+    ).rejects.toThrow(
+      `Companies House failed ${MAX_CONSECUTIVE_CH_ERRORS} requests in a row (last: Companies House search failed: HTTP 400); check COMPANIES_HOUSE_API_KEY`,
+    );
+    expect(fake.paths).toHaveLength(MAX_CONSECUTIVE_CH_ERRORS);
+    expect(lines.filter((l) => l.includes("not linked"))).toHaveLength(
+      MAX_CONSECUTIVE_CH_ERRORS,
+    );
+    expect(lines.join("\n")).not.toContain(KEY);
+  });
+
+  it("still passes when fewer companies than the limit fail", async () => {
+    for (let i = 1; i < MAX_CONSECUTIVE_CH_ERRORS; i += 1) {
+      await db.insert(companies).values({
+        slug: `works-${i}`,
+        name: `Works Number ${i}`,
+        normalisedName: `works number ${i}`,
+        countryCode: "GB",
+      });
+    }
+    const { client, fake } = fixtureClient(() => jsonResponse("bad", 400));
+    const stats = await registryStep({
+      db,
+      client,
+      clock,
+      maxRequests: 100,
+      log: () => undefined,
+    });
+    expect(fake.paths).toHaveLength(MAX_CONSECUTIVE_CH_ERRORS - 1);
+    expect(stats.rateLimited).toBe(false);
+  });
+
+  it("fails when every profile refresh is rejected", async () => {
+    for (let i = 1; i <= MAX_CONSECUTIVE_CH_ERRORS; i += 1) {
+      const [company] = await db
+        .insert(companies)
+        .values({
+          slug: `linked-${i}`,
+          name: `Linked Works ${i}`,
+          normalisedName: `linked works ${i}`,
+          countryCode: "US",
+        })
+        .returning();
+      await db.insert(registryLinks).values({
+        companyId: company!.id,
+        registry: "companies_house",
+        registryId: `0910000${i}`,
+        registryName: `LINKED WORKS ${i} LIMITED`,
+        status: "linked",
+        method: "manual",
+        reason: "test",
+        decidedBy: "manual",
+      });
+    }
+    const { client } = fixtureClient(() => jsonResponse("bad", 400));
+    await expect(
+      registryStep({
+        db,
+        client,
+        clock,
+        maxRequests: 100,
+        log: () => undefined,
+      }),
+    ).rejects.toBeInstanceOf(RepeatedChErrors);
+  });
+});
+
+describe("ChErrorStreak", () => {
+  it("also stops on responses that do not match the schemas", () => {
+    const streak = new ChErrorStreak();
+    const shape = () =>
+      new ChResponseError("search", "did not match the expected shape");
+    for (let i = 1; i < MAX_CONSECUTIVE_CH_ERRORS; i += 1) {
+      streak.failed(shape());
+    }
+    expect(() => streak.failed(shape())).toThrow(
+      "did not match the expected shape); check the response schemas",
+    );
+  });
+
+  it("resets on success and ignores errors that are not from Companies House", () => {
+    const streak = new ChErrorStreak();
+    for (let i = 1; i < MAX_CONSECUTIVE_CH_ERRORS; i += 1) {
+      streak.failed(new ChApiError(400, "search"));
+    }
+    streak.succeeded();
+    for (let i = 1; i < MAX_CONSECUTIVE_CH_ERRORS; i += 1) {
+      streak.failed(new ChApiError(500, "search"));
+    }
+    streak.failed(new Error("database hiccup"));
+    expect(() => streak.failed(new ChApiError(400, "search"))).toThrow(
+      RepeatedChErrors,
+    );
   });
 });

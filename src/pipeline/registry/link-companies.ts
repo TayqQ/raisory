@@ -29,6 +29,7 @@ import {
 import { addMergeCandidate } from "@/pipeline/resolve/merge-candidates";
 import {
   ChApiError,
+  ChResponseError,
   RateLimitedError,
   TimeLimitReached,
   type ChClient,
@@ -235,6 +236,48 @@ export function isFatal(error: unknown): boolean {
     error instanceof ChApiError &&
     (error.status === 401 || error.status === 403)
   );
+}
+
+/** Companies House errors in a row that end the step (see `ChErrorStreak`). */
+export const MAX_CONSECUTIVE_CH_ERRORS = 5;
+
+/** Thrown when Companies House fails every request, so the step fails. */
+export class RepeatedChErrors extends Error {
+  constructor(count: number, last: ChApiError | ChResponseError) {
+    const hint =
+      last instanceof ChApiError
+        ? "check COMPANIES_HOUSE_API_KEY"
+        : "check the response schemas";
+    super(
+      `Companies House failed ${count} requests in a row (last: ${last.message}); ${hint}`,
+    );
+    this.name = "RepeatedChErrors";
+  }
+}
+
+/**
+ * Counts Companies House errors in a row. One company failing is skipped and
+ * tried next run, but a bad key (HTTP 400 on every request) or a change in
+ * the response shape fails every company, which would otherwise pass as a
+ * quiet run with nothing linked.
+ */
+export class ChErrorStreak {
+  private count = 0;
+
+  succeeded(): void {
+    this.count = 0;
+  }
+
+  /** Throws `RepeatedChErrors` once the limit is reached. */
+  failed(error: unknown): void {
+    if (!(error instanceof ChApiError || error instanceof ChResponseError)) {
+      return;
+    }
+    this.count += 1;
+    if (this.count >= MAX_CONSECUTIVE_CH_ERRORS) {
+      throw new RepeatedChErrors(this.count, error);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1006,6 +1049,7 @@ export async function linkCompanies(
     searchNotes: new Map(),
   };
   const hintCounts = new Map<string, number>();
+  const streak = new ChErrorStreak();
   let hintOnly = 0;
 
   try {
@@ -1029,6 +1073,7 @@ export async function linkCompanies(
         }
         try {
           await linkOne(ctx, facts, fingerprint);
+          streak.succeeded();
           const reasons = reasonsById.get(id) ?? [];
           if (searchedOnHintsOnly(reasons)) {
             hintOnly += 1;
@@ -1047,6 +1092,7 @@ export async function linkCompanies(
           }
           // Left due, so the next run tries again.
           log(`registry: company ${id} not linked: ${describeError(error)}`);
+          streak.failed(error);
         }
       }
     }

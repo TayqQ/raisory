@@ -52,8 +52,12 @@ export const pipelineEnvSchema = z.object({
   /** Raises the GitHub API rate limit for star snapshots. Optional. */
   GITHUB_TOKEN: z.string().min(1).optional(),
   // Phase 3
-  /** Companies House API key. The registry step is skipped without it. Never given to the web app. */
-  COMPANIES_HOUSE_API_KEY: z.string().min(1).optional(),
+  /**
+   * Companies House API key. The registry step is skipped without it. Never
+   * given to the web app. Trimmed, because a key copied from the portal can
+   * carry a tab, which Companies House answers with HTTP 400.
+   */
+  COMPANIES_HOUSE_API_KEY: z.string().trim().min(1).optional(),
   MAX_CH_REQUESTS_PER_RUN: z.coerce.number().int().positive().default(2000),
   /** Time limit for the registry step, checked between companies (D63). */
   MAX_CH_MINUTES_PER_RUN: z.coerce.number().int().min(1).max(60).default(17),
@@ -99,11 +103,12 @@ function parseEnv<T extends z.ZodObject>(
   schema: T,
   env: EnvSource,
 ): z.infer<T> {
-  // Unset CI secrets arrive as empty strings; treat them as missing.
+  // Unset CI secrets arrive as empty strings; treat them, and values that
+  // are only spaces or tabs, as missing.
   const input: EnvSource = {};
   for (const key of Object.keys(schema.shape)) {
     const value = env[key];
-    if (value !== undefined && value !== "") input[key] = value;
+    if (value !== undefined && value.trim() !== "") input[key] = value;
   }
 
   const result = schema.safeParse(input);

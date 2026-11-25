@@ -215,6 +215,22 @@ describe("Phase 3 pipeline settings", () => {
     expect(env).not.toHaveProperty("COMPANIES_HOUSE_API_KEY");
   });
 
+  it("trims spaces and tabs from COMPANIES_HOUSE_API_KEY", () => {
+    const env = parsePipelineEnv({
+      ...secrets,
+      COMPANIES_HOUSE_API_KEY: "\tch-test-key-789 \n",
+    });
+    expect(env.COMPANIES_HOUSE_API_KEY).toBe("ch-test-key-789");
+  });
+
+  it("treats a COMPANIES_HOUSE_API_KEY of only whitespace as missing", () => {
+    const env = parsePipelineEnv({
+      ...secrets,
+      COMPANIES_HOUSE_API_KEY: " \t",
+    });
+    expect(env).not.toHaveProperty("COMPANIES_HOUSE_API_KEY");
+  });
+
   it("treats an empty COMPANIES_HOUSE_API_KEY as missing", () => {
     const env = parsePipelineEnv({ ...secrets, COMPANIES_HOUSE_API_KEY: "" });
     expect(env).not.toHaveProperty("COMPANIES_HOUSE_API_KEY");

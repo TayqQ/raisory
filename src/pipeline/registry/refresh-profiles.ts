@@ -30,6 +30,7 @@ import {
   RequestBudget,
   RequestLimitReached,
   type RegistryRunStats,
+  ChErrorStreak,
   describeError,
   emptyRegistryStats,
   filingsSince,
@@ -182,6 +183,7 @@ export async function refreshProfiles(
   const log = options.log ?? (() => undefined);
   const startUsed = budget.used();
 
+  const streak = new ChErrorStreak();
   try {
     const due = await profilesDue(db, now);
     for (const item of due) {
@@ -189,6 +191,7 @@ export async function refreshProfiles(
       try {
         budget.require(1);
         const profile = await client.getCompany(item.companyNumber);
+        streak.succeeded();
         if (profile === null) {
           log(`registry: profile ${item.companyNumber} not found; link kept`);
           continue;
@@ -245,6 +248,7 @@ export async function refreshProfiles(
         log(
           `registry: profile ${item.companyNumber} not refreshed: ${describeError(error)}`,
         );
+        streak.failed(error);
       }
     }
   } catch (error) {
